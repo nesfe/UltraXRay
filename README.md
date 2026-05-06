@@ -64,8 +64,10 @@ bash <(curl -fsSL https://raw.githubusercontent.com/nesfe/UltraXRay/main/install
 
 Установщик спросит:
 
-- домен для маскировки `REALITY SNI`, по умолчанию `www.mix.com`;
+- домен или URL для маскировки `REALITY SNI`, по умолчанию `www.mix.com`;
 - пароль для `Hysteria 2`; если оставить пустым, пароль будет сгенерирован автоматически.
+
+Можно вводить как `lemanapro.ru`, так и `https://lemanapro.ru/`. Установщик сам приведёт ввод к чистому hostname для `openssl`, REALITY SNI и клиентских ссылок.
 
 ## Что делает установщик
 

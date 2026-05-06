@@ -52,6 +52,22 @@ iptables -t nat -S
 Configuration OK.
 ```
 
+## Ошибка Проверки TLS-Хоста
+
+Если при установке появляется ошибка вида:
+
+```text
+s_client: -connect argument or target parameter malformed or ambiguous
+```
+
+значит в старой версии установщика URL был передан в `openssl` без нормализации. Актуальная версия принимает `https://domain/` и приводит его к `domain`.
+
+Для ручной проверки используйте чистый hostname:
+
+```bash
+echo | openssl s_client -connect lemanapro.ru:443 -servername lemanapro.ru -verify_hostname lemanapro.ru
+```
+
 ## Клиент Не Импортирует VLESS
 
 Проверьте:

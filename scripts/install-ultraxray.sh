@@ -20,6 +20,20 @@ warn() { printf "${YELLOW}[!] %s${NC}\n" "$1"; }
 err() { printf "${RED}[ОШИБКА] %s${NC}\n" "$1"; }
 info() { printf "    %s\n" "$1"; }
 
+normalize_hostname() {
+  local value="$1"
+  value="$(printf '%s' "$value" | sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//')"
+  value="${value#http://}"
+  value="${value#https://}"
+  value="${value%%\#*}"
+  value="${value%%\?*}"
+  value="${value%%/*}"
+  value="${value##*@}"
+  value="$(printf '%s' "$value" | sed -E 's/:[0-9]+$//')"
+  value="$(printf '%s' "$value" | tr '[:upper:]' '[:lower:]')"
+  printf '%s' "$value"
+}
+
 urlencode() {
   jq -rn --arg value "$1" '$value|@uri'
 }
@@ -47,8 +61,14 @@ printf "Установщик двухъядерной конфигурации X
 printf "Режим установки: полная пересборка proxy-стека на сервере\n"
 
 TARGET_HOST_DEFAULT="www.mix.com"
-read -r -p "Домен для маскировки REALITY SNI [${TARGET_HOST_DEFAULT}]: " TARGET_HOST
-TARGET_HOST="${TARGET_HOST:-$TARGET_HOST_DEFAULT}"
+read -r -p "Домен или URL для маскировки REALITY SNI [${TARGET_HOST_DEFAULT}]: " TARGET_HOST_INPUT
+TARGET_HOST_INPUT="${TARGET_HOST_INPUT:-$TARGET_HOST_DEFAULT}"
+TARGET_HOST="$(normalize_hostname "$TARGET_HOST_INPUT")"
+if [[ -z "$TARGET_HOST" || "$TARGET_HOST" == *://* || "$TARGET_HOST" == *"/"* ]]; then
+  err "Некорректный домен для REALITY SNI: ${TARGET_HOST_INPUT}"
+  exit 1
+fi
+ok "REALITY SNI: ${TARGET_HOST}"
 
 read -r -s -p "Пароль для Hysteria 2 [оставьте пустым для генерации]: " HYSTERIA_PASSWORD
 printf "\n"
@@ -61,8 +81,8 @@ warn "Будут удалены старые Xray/Hysteria, очищены iptab
 warn "Xray займёт 443/tcp, Hysteria 2 займёт 20000-50000/udp."
 
 step "Установка базовых зависимостей"
-apt-get update -qq
-apt-get install -y -qq curl openssl ufw ca-certificates qrencode jq unzip iptables
+DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a apt-get update -qq
+DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a apt-get install -y -qq curl openssl ufw ca-certificates qrencode jq unzip iptables
 ok "Системные зависимости установлены"
 
 step "Полная очистка старого proxy-стека"
@@ -72,9 +92,21 @@ systemctl stop hysteria-server hysteria 2>/dev/null || true
 systemctl disable hysteria-server hysteria 2>/dev/null || true
 
 if curl -fsSL https://get.hy2.sh/ -o /tmp/ultraxray-get-hy2.sh 2>/dev/null; then
-  bash /tmp/ultraxray-get-hy2.sh --remove 2>/dev/null || true
+  if bash /tmp/ultraxray-get-hy2.sh --remove >/tmp/ultraxray-hy2-remove.log 2>&1; then
+    ok "Предыдущая установка Hysteria удалена"
+  else
+    warn "Официальный remover Hysteria завершился с предупреждением, продолжаю ручную очистку"
+    tail -n 20 /tmp/ultraxray-hy2-remove.log || true
+  fi
   rm -f /tmp/ultraxray-get-hy2.sh
 fi
+
+rm -f /etc/systemd/system/hysteria-server.service \
+  /etc/systemd/system/hysteria-server@.service \
+  /etc/systemd/system/multi-user.target.wants/hysteria-server.service \
+  /etc/systemd/system/multi-user.target.wants/hysteria-server@*.service 2>/dev/null || true
+systemctl daemon-reload 2>/dev/null || true
+userdel -r hysteria 2>/dev/null || true
 
 rm -rf /usr/local/etc/xray \
   /etc/hysteria \

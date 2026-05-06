@@ -24,10 +24,16 @@ set -euo pipefail
 
 Скрипт спрашивает:
 
-- `TARGET_HOST` — домен для REALITY SNI;
+- `TARGET_HOST_INPUT` — домен или URL для REALITY SNI;
 - `HYSTERIA_PASSWORD` — пароль Hysteria 2.
 
 Если пароль Hysteria пустой, он генерируется автоматически.
+
+`TARGET_HOST_INPUT` нормализуется перед использованием:
+
+- `https://lemanapro.ru/` превращается в `lemanapro.ru`;
+- `lemanapro.ru:443/path` превращается в `lemanapro.ru`;
+- результат используется в `openssl s_client`, `realitySettings.serverNames`, `target`, Hysteria SNI и клиентских ссылках.
 
 ## Очистка
 
