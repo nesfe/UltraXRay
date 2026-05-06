@@ -420,7 +420,9 @@ fi
 
 step "Сохранение доступов"
 VLESS_LINK="vless://${XRAY_UUID}@${SERVER_IP}:443?encryption=$(urlencode "$VLESS_ENCRYPTION")&type=xhttp&security=reality&sni=$(urlencode "$TARGET_HOST")&fp=chrome&pbk=$(urlencode "$REALITY_PUBLIC_KEY")&sid=${REALITY_SHORT_ID}&path=$(urlencode "$XHTTP_PATH")&mode=packet-up&spx=$(urlencode "$SPIDER_X")#UltraXRay-XHTTP-REALITY"
-HY2_LINK="hy2://$(urlencode "$HYSTERIA_PASSWORD")@${SERVER_IP}:20000-50000/?insecure=1&obfs=salamander&obfs-password=$(urlencode "$HYSTERIA_OBFS_PASSWORD")&sni=$(urlencode "$TARGET_HOST")&pinSHA256=$(urlencode "$HYSTERIA_PIN_SHA256")#UltraXRay-Hysteria2"
+HY2_LINK="hysteria2://$(urlencode "$HYSTERIA_PASSWORD")@${SERVER_IP}:20000/?insecure=1&obfs=salamander&obfs-password=$(urlencode "$HYSTERIA_OBFS_PASSWORD")&sni=$(urlencode "$TARGET_HOST")#UltraXRay-Hysteria2-Happ"
+HY2_HOPPING_LINK="hysteria2://$(urlencode "$HYSTERIA_PASSWORD")@${SERVER_IP}:20000-50000/?insecure=1&obfs=salamander&obfs-password=$(urlencode "$HYSTERIA_OBFS_PASSWORD")&sni=$(urlencode "$TARGET_HOST")&pinSHA256=$(urlencode "$HYSTERIA_PIN_SHA256")#UltraXRay-Hysteria2-PortHopping"
+HY2_HOPPING_ALIAS_LINK="hy2://$(urlencode "$HYSTERIA_PASSWORD")@${SERVER_IP}:20000-50000/?insecure=1&obfs=salamander&obfs-password=$(urlencode "$HYSTERIA_OBFS_PASSWORD")&sni=$(urlencode "$TARGET_HOST")&pinSHA256=$(urlencode "$HYSTERIA_PIN_SHA256")#UltraXRay-Hysteria2-PortHopping"
 
 cat > /root/ultraproxy.env <<EOF
 SERVER_IP=$(env_value "$SERVER_IP")
@@ -439,19 +441,26 @@ HYSTERIA_CERT_FINGERPRINT=$(env_value "$HYSTERIA_CERT_FINGERPRINT")
 HYSTERIA_PIN_SHA256=$(env_value "$HYSTERIA_PIN_SHA256")
 VLESS_LINK=$(env_value "$VLESS_LINK")
 HY2_LINK=$(env_value "$HY2_LINK")
+HY2_HOPPING_LINK=$(env_value "$HY2_HOPPING_LINK")
+HY2_HOPPING_ALIAS_LINK=$(env_value "$HY2_HOPPING_ALIAS_LINK")
 EOF
 chmod 600 /root/ultraproxy.env
 
 printf '%s\n' "$VLESS_LINK" > /root/ultraxray-vless-link.txt
 printf '%s\n' "$HY2_LINK" > /root/ultraxray-hy2-link.txt
+printf '%s\n' "$HY2_HOPPING_LINK" > /root/ultraxray-hy2-hopping-link.txt
+printf '%s\n' "$HY2_HOPPING_ALIAS_LINK" > /root/ultraxray-hy2-hopping-alias-link.txt
 printf '%s' "$VLESS_LINK" | qrencode -o /root/ultraxray-vless-qr.png
 printf '%s' "$HY2_LINK" | qrencode -o /root/ultraxray-hy2-qr.png
+printf '%s' "$HY2_HOPPING_LINK" | qrencode -o /root/ultraxray-hy2-hopping-qr.png
 
 ok "Сохранён /root/ultraproxy.env"
 ok "Сохранён /root/ultraxray-vless-link.txt"
 ok "Сохранён /root/ultraxray-vless-qr.png"
 ok "Сохранён /root/ultraxray-hy2-link.txt"
 ok "Сохранён /root/ultraxray-hy2-qr.png"
+ok "Сохранён /root/ultraxray-hy2-hopping-link.txt"
+ok "Сохранён /root/ultraxray-hy2-hopping-qr.png"
 
 step "Результат установки"
 info "Xray: VLESS + REALITY + XHTTP + VLESS Encryption"
@@ -465,10 +474,15 @@ cat /root/ultraxray-vless-link.txt
 printf "\n\n${GREEN}VLESS QR-код${NC}\n\n"
 printf '%s' "$VLESS_LINK" | qrencode -t ANSIUTF8
 
-printf "\n\n${GREEN}Hysteria 2 ссылка${NC}\n\n"
+printf "\n\n${GREEN}Hysteria 2 ссылка для Happ${NC}\n\n"
 cat /root/ultraxray-hy2-link.txt
 printf "\n\n${GREEN}Hysteria 2 QR-код${NC}\n\n"
 printf '%s' "$HY2_LINK" | qrencode -t ANSIUTF8
+
+printf "\n\n${GREEN}Hysteria 2 Port Hopping ссылка${NC}\n\n"
+cat /root/ultraxray-hy2-hopping-link.txt
+printf "\n\n${GREEN}Hysteria 2 Port Hopping QR-код${NC}\n\n"
+printf '%s' "$HY2_HOPPING_LINK" | qrencode -t ANSIUTF8
 
 printf "\n\n${CYAN}Полезные команды${NC}\n"
 printf "  systemctl status xray\n"
