@@ -1,5 +1,7 @@
 # Sources
 
+Документ фиксирует первичные источники, на которые опирается синтаксис `UltraXRay`.
+
 - Xray VLESS XHTTP REALITY example: https://raw.githubusercontent.com/XTLS/Xray-examples/main/VLESS-XHTTP-Reality/minimal-steal_others/server.jsonc
 - Xray VLESS Encryption docs: https://xtls.github.io/en/config/inbounds/vless.html
 - Xray command docs: https://xtls.github.io/en/document/command
