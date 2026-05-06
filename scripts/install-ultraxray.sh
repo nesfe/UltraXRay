@@ -179,29 +179,13 @@ iptables -P OUTPUT ACCEPT 2>/dev/null || true
 ok "Старые сервисы, конфиги и firewall-правила очищены"
 
 step "Проверка TLS-хоста для REALITY"
-TLS_CHECK_HOST="$TARGET_HOST"
-TLS_CHECK_OK=0
-info "Проверяю ${TARGET_HOST}:443, таймаут 20 секунд"
+info "Использую ровно введённый SNI: ${TARGET_HOST}"
+info "Проверяю ${TARGET_HOST}:443 справочно, установка от результата не зависит"
 if check_tls_host "$TARGET_HOST" /tmp/ultraxray-target.log; then
-  TLS_CHECK_OK=1
+  ok "Сертификат ${TARGET_HOST} успешно проверен"
 else
-  if [[ "$TARGET_HOST" != www.* ]]; then
-    WWW_TARGET_HOST="www.${TARGET_HOST}"
-    info "Проверяю ${WWW_TARGET_HOST}:443 как fallback"
-    if check_tls_host "$WWW_TARGET_HOST" /tmp/ultraxray-target-www.log; then
-      TARGET_HOST="$WWW_TARGET_HOST"
-      TLS_CHECK_HOST="$WWW_TARGET_HOST"
-      TLS_CHECK_OK=1
-      warn "Для REALITY SNI будет использован ${TARGET_HOST}, потому что он прошёл TLS-проверку"
-    fi
-  fi
-fi
-
-if [[ "$TLS_CHECK_OK" == "1" ]]; then
-  ok "Сертификат ${TLS_CHECK_HOST} успешно проверен"
-else
-  warn "TLS-проверка ${TARGET_HOST} не прошла, установка продолжится"
-  warn "Если профиль Xray не подключится, выберите другой REALITY SNI или проверьте исходящий доступ VPS к ${TARGET_HOST}:443"
+  warn "TLS-проверка ${TARGET_HOST} не прошла, но установка продолжится"
+  warn "REALITY будет настроен с SNI ${TARGET_HOST}, как указано пользователем"
   sed -n '1,60p' /tmp/ultraxray-target.log || true
 fi
 
