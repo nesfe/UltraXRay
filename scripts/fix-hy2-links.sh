@@ -36,12 +36,11 @@ source "$ENV_FILE"
 require_var SERVER_IP
 require_var TARGET_HOST
 require_var HYSTERIA_PASSWORD
-require_var HYSTERIA_OBFS_PASSWORD
 
 HYSTERIA_PIN_SHA256="${HYSTERIA_PIN_SHA256:-}"
-HY2_LINK="hy2://$(urlencode "$HYSTERIA_PASSWORD")@${SERVER_IP}:20000-50000/?security=tls&insecure=1&obfs=salamander&obfs-password=$(urlencode "$HYSTERIA_OBFS_PASSWORD")&sni=$(urlencode "$TARGET_HOST")&mportHopInt=30#UltraXRay-Hysteria2-Full"
-HY2_SINGLE_LINK="hy2://$(urlencode "$HYSTERIA_PASSWORD")@${SERVER_IP}:20000/?security=tls&insecure=1&obfs=salamander&obfs-password=$(urlencode "$HYSTERIA_OBFS_PASSWORD")&sni=$(urlencode "$TARGET_HOST")#UltraXRay-Hysteria2-SinglePort"
-HY2_OFFICIAL_LINK="hysteria2://$(urlencode "$HYSTERIA_PASSWORD")@${SERVER_IP}:20000-50000/?insecure=1&obfs=salamander&obfs-password=$(urlencode "$HYSTERIA_OBFS_PASSWORD")&sni=$(urlencode "$TARGET_HOST")"
+HY2_LINK="hy2://$(urlencode "$HYSTERIA_PASSWORD")@${SERVER_IP}:20000-50000/?security=tls&insecure=1&sni=$(urlencode "$TARGET_HOST")&mportHopInt=30#UltraXRay-Hysteria2-Full"
+HY2_SINGLE_LINK="hy2://$(urlencode "$HYSTERIA_PASSWORD")@${SERVER_IP}:20000/?security=tls&insecure=1&sni=$(urlencode "$TARGET_HOST")#UltraXRay-Hysteria2-SinglePort"
+HY2_OFFICIAL_LINK="hysteria2://$(urlencode "$HYSTERIA_PASSWORD")@${SERVER_IP}:20000-50000/?insecure=1&sni=$(urlencode "$TARGET_HOST")"
 
 if [[ -n "$HYSTERIA_PIN_SHA256" ]]; then
   HY2_OFFICIAL_LINK="${HY2_OFFICIAL_LINK}&pinSHA256=$(urlencode "$HYSTERIA_PIN_SHA256")"

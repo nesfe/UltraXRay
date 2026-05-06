@@ -88,7 +88,7 @@ echo | openssl s_client -connect lemanapro.ru:443 -servername lemanapro.ru -veri
 
 - открыт ли UDP диапазон у VPS-провайдера;
 - не блокирует ли провайдер входящий UDP;
-- совпадает ли `obfs-password`;
+- корректно ли клиент импортировал пароль Hysteria 2;
 - совпадает ли основной пароль Hysteria;
 - импортировался ли `pinSHA256`;
 - не урезал ли клиент multi-port формат `20000-50000`.

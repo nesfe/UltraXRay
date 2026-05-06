@@ -2,14 +2,14 @@
 
 ![Xray XHTTP REALITY](https://img.shields.io/badge/Xray-XHTTP%20REALITY-0f172a?style=for-the-badge)
 ![VLESS Encryption](https://img.shields.io/badge/VLESS-ML--KEM--768-1d4ed8?style=for-the-badge)
-![Hysteria 2](https://img.shields.io/badge/Hysteria%202-Salamander-7c3aed?style=for-the-badge)
+![Hysteria 2](https://img.shields.io/badge/Hysteria%202-Port%20Hopping-7c3aed?style=for-the-badge)
 ![Ubuntu](https://img.shields.io/badge/Ubuntu-22.04%2B-e95420?style=for-the-badge)
 ![One Command Install](https://img.shields.io/badge/Install-One%20Command-166534?style=for-the-badge)
 
 `UltraXRay` разворачивает два независимых proxy-ядра на одном VPS:
 
 - `Xray-core`: `VLESS + REALITY + XHTTP` на `443/tcp` с VLESS Encryption, сгенерированной через `xray vlessenc`;
-- `Hysteria 2`: UDP-транспорт с `Salamander` obfuscation и port hopping в диапазоне `20000-50000/udp`.
+- `Hysteria 2`: UDP-транспорт с port hopping в диапазоне `20000-50000/udp`.
 
 Проект сохраняет стиль `ClearXRay`: строгий `bash`, цветной пошаговый вывод, полная очистка старого proxy-стека, `systemd`, `ufw`, сохранение доступов, готовые ссылки и QR-коды.
 
@@ -40,9 +40,9 @@
 `Hysteria 2` используется как отдельный UDP-профиль:
 
 - port hopping `20000-50000/udp`;
-- `Salamander` obfuscation с отдельным случайным паролем;
 - самоподписанный сертификат;
-- `pinSHA256` в клиентской ссылке, чтобы не полагаться только на `insecure=1`.
+- Happ-compatible `hy2://` QR без Salamander obfs;
+- `pinSHA256` в official URI для клиентов, которые корректно импортируют pin.
 
 ## Сетевая схема
 
@@ -89,7 +89,7 @@ bash <(curl -fsSL https://raw.githubusercontent.com/nesfe/UltraXRay/main/install
 14. записывает `/usr/local/etc/xray/config.json`;
 15. проверяет Xray-конфиг через `xray run -test`;
 16. генерирует самоподписанный сертификат Hysteria 2;
-17. генерирует `Salamander` obfuscation password;
+17. генерирует параметры Hysteria 2 и fingerprint сертификата;
 18. записывает `/etc/hysteria/config.yaml`;
 19. настраивает `ufw`;
 20. включает и запускает `xray` и `hysteria-server.service`;
@@ -143,22 +143,20 @@ vless://UUID@SERVER_IP:443?encryption=VLESS_ENCRYPTION&type=xhttp&security=reali
 Типовая ссылка выглядит так:
 
 ```text
-hy2://PASSWORD@SERVER_IP:20000-50000/?insecure=1&obfs=salamander&obfs-password=OBFS_PASSWORD&sni=TARGET_HOST&pinSHA256=CERT_FINGERPRINT#UltraXRay-Hysteria2
+hy2://PASSWORD@SERVER_IP:20000-50000/?security=tls&insecure=1&sni=TARGET_HOST&mportHopInt=30#UltraXRay-Hysteria2-Full
 ```
 
 Ключевые параметры:
 
 - `20000-50000` — multi-port/port hopping диапазон;
-- `obfs=salamander` — включение Salamander obfuscation;
-- `obfs-password` — отдельный пароль обфускации;
 - `insecure=1` — требуется из-за self-signed сертификата;
-- `pinSHA256` — SHA-256 fingerprint сертификата в формате Hysteria URI без двоеточий, чтобы клиент мог закрепить конкретный сертификат;
+- `mportHopInt=30` — интервал port hopping для клиентов, которые поддерживают этот параметр;
 - `sni` — тот же домен, что указан пользователем при установке.
 
 Установщик сохраняет несколько URI для одного и того же полноценного Hysteria 2 сервера:
 
-- `/root/ultraxray-hy2-link.txt` — `hy2://` с `20000-50000`, Salamander и `mportHopInt=30`;
-- `/root/ultraxray-hy2-single-link.txt` — тот же Hysteria 2 + Salamander, но на одном порту `20000` для клиентов, которые режут multi-port URI;
+- `/root/ultraxray-hy2-link.txt` — `hy2://` с `20000-50000` и `mportHopInt=30`;
+- `/root/ultraxray-hy2-single-link.txt` — тот же Hysteria 2, но на одном порту `20000` для клиентов, которые режут multi-port URI;
 - `/root/ultraxray-hy2-official-link.txt` — официальный `hysteria2://` URI с `pinSHA256`.
 
 ## Повторный вывод ссылок

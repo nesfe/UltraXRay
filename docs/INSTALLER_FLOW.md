@@ -75,7 +75,7 @@ set -euo pipefail
 2. генерирует self-signed ECDSA certificate;
 3. вычисляет SHA-256 fingerprint;
 4. нормализует `pinSHA256` в формат Hysteria URI без двоеточий и в lowercase;
-5. генерирует Salamander obfuscation password;
+5. генерирует параметры Hysteria 2 и fingerprint сертификата;
 6. пишет `/etc/hysteria/config.yaml`;
 7. запускает `hysteria-server.service`.
 

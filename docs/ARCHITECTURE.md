@@ -35,7 +35,7 @@
 
 - диапазон `20000-50000/udp`;
 - Hysteria 2 port hopping;
-- Salamander obfuscation;
+- port hopping на UDP;
 - самоподписанный сертификат;
 - `pinSHA256` в клиентской ссылке.
 
