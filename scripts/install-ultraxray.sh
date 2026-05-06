@@ -56,6 +56,13 @@ require_nonempty() {
   fi
 }
 
+validate_hostname() {
+  local value="$1"
+  if [[ ! "$value" =~ ^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$ ]]; then
+    return 1
+  fi
+}
+
 title
 printf "Установщик двухъядерной конфигурации Xray XHTTP REALITY и Hysteria 2\n"
 printf "Режим установки: полная пересборка proxy-стека на сервере\n"
@@ -64,7 +71,7 @@ TARGET_HOST_DEFAULT="www.mix.com"
 read -r -p "Домен или URL для маскировки REALITY SNI [${TARGET_HOST_DEFAULT}]: " TARGET_HOST_INPUT
 TARGET_HOST_INPUT="${TARGET_HOST_INPUT:-$TARGET_HOST_DEFAULT}"
 TARGET_HOST="$(normalize_hostname "$TARGET_HOST_INPUT")"
-if [[ -z "$TARGET_HOST" || "$TARGET_HOST" == *://* || "$TARGET_HOST" == *"/"* ]]; then
+if [[ -z "$TARGET_HOST" || "$TARGET_HOST" == *://* || "$TARGET_HOST" == *"/"* ]] || ! validate_hostname "$TARGET_HOST"; then
   err "Некорректный домен для REALITY SNI: ${TARGET_HOST_INPUT}"
   exit 1
 fi
@@ -72,10 +79,6 @@ ok "REALITY SNI: ${TARGET_HOST}"
 
 read -r -s -p "Пароль для Hysteria 2 [оставьте пустым для генерации]: " HYSTERIA_PASSWORD
 printf "\n"
-if [[ -z "$HYSTERIA_PASSWORD" ]]; then
-  HYSTERIA_PASSWORD="$(openssl rand -base64 24 | tr '+/' '-_' | tr -d '=')"
-  ok "Пароль Hysteria сгенерирован"
-fi
 
 warn "Будут удалены старые Xray/Hysteria, очищены iptables и сброшен UFW."
 warn "Xray займёт 443/tcp, Hysteria 2 займёт 20000-50000/udp."
@@ -85,7 +88,30 @@ DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a apt-get update -qq
 DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a apt-get install -y -qq curl openssl ufw ca-certificates qrencode jq unzip iptables
 ok "Системные зависимости установлены"
 
+if [[ -z "$HYSTERIA_PASSWORD" ]]; then
+  HYSTERIA_PASSWORD="$(openssl rand -base64 24 | tr '+/' '-_' | tr -d '=')"
+  ok "Пароль Hysteria сгенерирован"
+fi
+
 step "Полная очистка старого proxy-стека"
+if command -v docker >/dev/null 2>&1; then
+  warn "Обнаружен Docker. Выполняется удаление контейнеров, сетей и пакетов."
+  docker stop $(docker ps -aq) 2>/dev/null || true
+  docker rm $(docker ps -aq) 2>/dev/null || true
+  docker network prune -f 2>/dev/null || true
+  systemctl stop docker.socket docker.service 2>/dev/null || true
+  apt-get purge -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin 2>/dev/null || true
+  apt-get purge -y docker docker.io containerd runc 2>/dev/null || true
+  rm -rf /var/lib/docker /var/lib/containerd /etc/docker
+  ok "Docker удалён"
+else
+  ok "Docker не найден"
+fi
+
+rm -rf /opt/amnezia /etc/amnezia 2>/dev/null || true
+rm -rf /opt/outline /etc/outline 2>/dev/null || true
+ok "Остатки Amnezia и Outline удалены"
+
 systemctl stop xray 2>/dev/null || true
 systemctl disable xray 2>/dev/null || true
 systemctl stop hysteria-server hysteria 2>/dev/null || true
@@ -94,6 +120,7 @@ systemctl disable hysteria-server hysteria 2>/dev/null || true
 if curl -fsSL https://get.hy2.sh/ -o /tmp/ultraxray-get-hy2.sh 2>/dev/null; then
   if bash /tmp/ultraxray-get-hy2.sh --remove >/tmp/ultraxray-hy2-remove.log 2>&1; then
     ok "Предыдущая установка Hysteria удалена"
+    rm -f /tmp/ultraxray-hy2-remove.log
   else
     warn "Официальный remover Hysteria завершился с предупреждением, продолжаю ручную очистку"
     tail -n 20 /tmp/ultraxray-hy2-remove.log || true
@@ -118,6 +145,7 @@ rm -rf /usr/local/etc/xray \
   /root/ultraxray-hy2-qr.png 2>/dev/null || true
 
 fuser -k 443/tcp 2>/dev/null || true
+fuser -k 20000/udp 2>/dev/null || true
 
 iptables -F 2>/dev/null || true
 iptables -X 2>/dev/null || true
@@ -274,7 +302,8 @@ openssl req -x509 -nodes -newkey ec \
   -addext "subjectAltName=DNS:${TARGET_HOST}" >/dev/null 2>&1
 chmod 600 /etc/hysteria/server.key
 
-HYSTERIA_PIN_SHA256="$(openssl x509 -noout -fingerprint -sha256 -in /etc/hysteria/server.crt | sed 's/^sha256 Fingerprint=//; s/^SHA256 Fingerprint=//')"
+HYSTERIA_CERT_FINGERPRINT="$(openssl x509 -noout -fingerprint -sha256 -in /etc/hysteria/server.crt | sed 's/^sha256 Fingerprint=//; s/^SHA256 Fingerprint=//')"
+HYSTERIA_PIN_SHA256="$(printf '%s' "$HYSTERIA_CERT_FINGERPRINT" | tr -d ':' | tr '[:upper:]' '[:lower:]')"
 HYSTERIA_OBFS_PASSWORD="$(openssl rand -base64 24 | tr '+/' '-_' | tr -d '=')"
 
 cat > /etc/hysteria/config.yaml <<EOF
@@ -376,6 +405,7 @@ VLESS_DECRYPTION=$(env_value "$VLESS_DECRYPTION")
 VLESS_ENCRYPTION=$(env_value "$VLESS_ENCRYPTION")
 HYSTERIA_PASSWORD=$(env_value "$HYSTERIA_PASSWORD")
 HYSTERIA_OBFS_PASSWORD=$(env_value "$HYSTERIA_OBFS_PASSWORD")
+HYSTERIA_CERT_FINGERPRINT=$(env_value "$HYSTERIA_CERT_FINGERPRINT")
 HYSTERIA_PIN_SHA256=$(env_value "$HYSTERIA_PIN_SHA256")
 VLESS_LINK=$(env_value "$VLESS_LINK")
 HY2_LINK=$(env_value "$HY2_LINK")

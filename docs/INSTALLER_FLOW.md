@@ -39,12 +39,15 @@ set -euo pipefail
 
 Перед установкой выполняется:
 
+- удаление Docker-контейнеров, сетей, пакетов и данных, если Docker найден;
+- удаление остатков Amnezia и Outline;
 - остановка `xray`;
 - остановка `hysteria-server`;
 - попытка удаления Hysteria через официальный `get.hy2.sh --remove`;
 - удаление старых конфигов;
 - удаление старых access-файлов;
 - освобождение `443/tcp`;
+- освобождение `20000/udp`, первого порта Hysteria port hopping диапазона;
 - очистка `iptables`;
 - дальнейший `ufw reset`.
 
@@ -69,9 +72,10 @@ set -euo pipefail
 1. устанавливает Hysteria 2 через `get.hy2.sh`;
 2. генерирует self-signed ECDSA certificate;
 3. вычисляет SHA-256 fingerprint;
-4. генерирует Salamander obfuscation password;
-5. пишет `/etc/hysteria/config.yaml`;
-6. запускает `hysteria-server.service`.
+4. нормализует `pinSHA256` в формат Hysteria URI без двоеточий и в lowercase;
+5. генерирует Salamander obfuscation password;
+6. пишет `/etc/hysteria/config.yaml`;
+7. запускает `hysteria-server.service`.
 
 У Hysteria 2.8.2 нет отдельной команды `server ... check`, поэтому валидность подтверждается успешным стартом сервиса.
 

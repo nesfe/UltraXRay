@@ -45,7 +45,7 @@ hy2://PASSWORD@SERVER_IP:20000-50000/?insecure=1&obfs=salamander&obfs-password=O
 | `obfs=salamander` | режим обфускации |
 | `obfs-password` | пароль Salamander |
 | `sni` | SNI Hysteria TLS |
-| `pinSHA256` | fingerprint сертификата |
+| `pinSHA256` | fingerprint сертификата без двоеточий, как в официальном `hysteria share` |
 
 ## Где Хранятся Ссылки
 

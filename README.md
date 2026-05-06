@@ -75,24 +75,27 @@ bash <(curl -fsSL https://raw.githubusercontent.com/nesfe/UltraXRay/main/install
 
 1. проверяет запуск от `root`;
 2. устанавливает базовые зависимости: `curl`, `openssl`, `ufw`, `qrencode`, `jq`, `unzip`, `iptables`;
-3. останавливает старые сервисы `xray`, `hysteria-server`, `hysteria`;
-4. удаляет старые конфиги и артефакты `UltraXRay`;
-5. очищает `iptables` и сбрасывает политики в `ACCEPT` перед новой настройкой;
-6. проверяет TLS-хост, выбранный для `REALITY`;
-7. устанавливает актуальный `Xray-core`;
-8. устанавливает актуальный `Hysteria 2` через официальный установщик;
-9. генерирует `UUID`, `x25519` REALITY keys, `shortId`, `XHTTP path`, `spiderX`;
-10. генерирует пару `decryption/encryption` для VLESS Encryption через `xray vlessenc`;
-11. записывает `/usr/local/etc/xray/config.json`;
-12. проверяет Xray-конфиг через `xray run -test`;
-13. генерирует самоподписанный сертификат Hysteria 2;
-14. генерирует `Salamander` obfuscation password;
-15. записывает `/etc/hysteria/config.yaml`;
-16. настраивает `ufw`;
-17. включает и запускает `xray` и `hysteria-server.service`;
-18. формирует `vless://` и `hy2://` ссылки;
-19. печатает обе ссылки и оба QR-кода в терминал;
-20. сохраняет все параметры в `/root/ultraproxy.env`.
+3. удаляет Docker, если он найден, вместе с контейнерами, сетями и данными;
+4. удаляет остатки Amnezia и Outline;
+5. останавливает старые сервисы `xray`, `hysteria-server`, `hysteria`;
+6. удаляет старые конфиги и артефакты `UltraXRay`;
+7. освобождает `443/tcp` и `20000/udp`;
+8. очищает `iptables` и сбрасывает политики в `ACCEPT` перед новой настройкой;
+9. проверяет TLS-хост, выбранный для `REALITY`;
+10. устанавливает актуальный `Xray-core`;
+11. устанавливает актуальный `Hysteria 2` через официальный установщик;
+12. генерирует `UUID`, `x25519` REALITY keys, `shortId`, `XHTTP path`, `spiderX`;
+13. генерирует пару `decryption/encryption` для VLESS Encryption через `xray vlessenc`;
+14. записывает `/usr/local/etc/xray/config.json`;
+15. проверяет Xray-конфиг через `xray run -test`;
+16. генерирует самоподписанный сертификат Hysteria 2;
+17. генерирует `Salamander` obfuscation password;
+18. записывает `/etc/hysteria/config.yaml`;
+19. настраивает `ufw`;
+20. включает и запускает `xray` и `hysteria-server.service`;
+21. формирует `vless://` и `hy2://` ссылки;
+22. печатает обе ссылки и оба QR-кода в терминал;
+23. сохраняет все параметры в `/root/ultraproxy.env`.
 
 ## Что создаётся на сервере
 
@@ -149,7 +152,7 @@ hy2://PASSWORD@SERVER_IP:20000-50000/?insecure=1&obfs=salamander&obfs-password=O
 - `obfs=salamander` — включение Salamander obfuscation;
 - `obfs-password` — отдельный пароль обфускации;
 - `insecure=1` — требуется из-за self-signed сертификата;
-- `pinSHA256` — SHA-256 fingerprint сертификата, чтобы клиент мог закрепить конкретный сертификат;
+- `pinSHA256` — SHA-256 fingerprint сертификата в формате Hysteria URI без двоеточий, чтобы клиент мог закрепить конкретный сертификат;
 - `sni` — тот же домен, что указан пользователем при установке.
 
 ## Повторный вывод ссылок
