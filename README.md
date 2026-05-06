@@ -155,6 +155,12 @@ hy2://PASSWORD@SERVER_IP:20000-50000/?insecure=1&obfs=salamander&obfs-password=O
 - `pinSHA256` — SHA-256 fingerprint сертификата в формате Hysteria URI без двоеточий, чтобы клиент мог закрепить конкретный сертификат;
 - `sni` — тот же домен, что указан пользователем при установке.
 
+Установщик сохраняет несколько URI для одного и того же полноценного Hysteria 2 сервера:
+
+- `/root/ultraxray-hy2-link.txt` — `hy2://` с `20000-50000`, Salamander и `mportHopInt=30`;
+- `/root/ultraxray-hy2-single-link.txt` — тот же Hysteria 2 + Salamander, но на одном порту `20000` для клиентов, которые режут multi-port URI;
+- `/root/ultraxray-hy2-official-link.txt` — официальный `hysteria2://` URI с `pinSHA256`.
+
 ## Повторный вывод ссылок
 
 В локальном клоне:

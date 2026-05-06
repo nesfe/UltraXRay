@@ -24,11 +24,11 @@ else
 fi
 
 echo
-echo "Hysteria 2 ссылка для Happ:"
+echo "Hysteria 2 Full ссылка:"
 echo
 printf '%s\n' "$HY2_LINK"
 echo
-echo "Hysteria 2 QR-код:"
+echo "Hysteria 2 Full QR-код:"
 echo
 if command -v qrencode >/dev/null 2>&1; then
   printf '%s' "$HY2_LINK" | qrencode -t ANSIUTF8
@@ -36,31 +36,16 @@ else
   echo "qrencode не установлен. Установите пакет: apt-get install -y qrencode"
 fi
 
-if [[ -n "${HY2_HOPPING_LINK:-}" ]]; then
+if [[ -n "${HY2_SINGLE_LINK:-}" ]]; then
   echo
-  echo "Hysteria 2 Port Hopping ссылка:"
+  echo "Hysteria 2 Single-port ссылка:"
   echo
-  printf '%s\n' "$HY2_HOPPING_LINK"
+  printf '%s\n' "$HY2_SINGLE_LINK"
   echo
-  echo "Hysteria 2 Port Hopping QR-код:"
-  echo
-  if command -v qrencode >/dev/null 2>&1; then
-    printf '%s' "$HY2_HOPPING_LINK" | qrencode -t ANSIUTF8
-  else
-    echo "qrencode не установлен. Установите пакет: apt-get install -y qrencode"
-  fi
-fi
-
-if [[ -n "${HY2_HAPP_LINK:-}" ]]; then
-  echo
-  echo "Hysteria 2 Happ compatibility ссылка:"
-  echo
-  printf '%s\n' "$HY2_HAPP_LINK"
-  echo
-  echo "Hysteria 2 Happ compatibility QR-код:"
+  echo "Hysteria 2 Single-port QR-код:"
   echo
   if command -v qrencode >/dev/null 2>&1; then
-    printf '%s' "$HY2_HAPP_LINK" | qrencode -t ANSIUTF8
+    printf '%s' "$HY2_SINGLE_LINK" | qrencode -t ANSIUTF8
   else
     echo "qrencode не установлен. Установите пакет: apt-get install -y qrencode"
   fi

@@ -39,8 +39,8 @@ require_var HYSTERIA_PASSWORD
 require_var HYSTERIA_OBFS_PASSWORD
 
 HYSTERIA_PIN_SHA256="${HYSTERIA_PIN_SHA256:-}"
-HY2_LINK="hy2://$(urlencode "$HYSTERIA_PASSWORD")@${SERVER_IP}:20000?security=tls&insecure=1&obfs=salamander&obfs-password=$(urlencode "$HYSTERIA_OBFS_PASSWORD")&sni=$(urlencode "$TARGET_HOST")#UltraXRay-Hysteria2-Happ"
-HY2_HOPPING_LINK="hy2://$(urlencode "$HYSTERIA_PASSWORD")@${SERVER_IP}:20000?security=tls&insecure=1&obfs=salamander&obfs-password=$(urlencode "$HYSTERIA_OBFS_PASSWORD")&sni=$(urlencode "$TARGET_HOST")&mport=20000-50000&mportHopInt=30#UltraXRay-Hysteria2-PortHopping"
+HY2_LINK="hy2://$(urlencode "$HYSTERIA_PASSWORD")@${SERVER_IP}:20000-50000/?security=tls&insecure=1&obfs=salamander&obfs-password=$(urlencode "$HYSTERIA_OBFS_PASSWORD")&sni=$(urlencode "$TARGET_HOST")&mportHopInt=30#UltraXRay-Hysteria2-Full"
+HY2_SINGLE_LINK="hy2://$(urlencode "$HYSTERIA_PASSWORD")@${SERVER_IP}:20000/?security=tls&insecure=1&obfs=salamander&obfs-password=$(urlencode "$HYSTERIA_OBFS_PASSWORD")&sni=$(urlencode "$TARGET_HOST")#UltraXRay-Hysteria2-SinglePort"
 HY2_OFFICIAL_LINK="hysteria2://$(urlencode "$HYSTERIA_PASSWORD")@${SERVER_IP}:20000-50000/?insecure=1&obfs=salamander&obfs-password=$(urlencode "$HYSTERIA_OBFS_PASSWORD")&sni=$(urlencode "$TARGET_HOST")"
 
 if [[ -n "$HYSTERIA_PIN_SHA256" ]]; then
@@ -50,10 +50,10 @@ fi
 HY2_OFFICIAL_LINK="${HY2_OFFICIAL_LINK}#UltraXRay-Hysteria2-Official"
 
 tmp_env="$(mktemp)"
-awk '!/^(HY2_LINK|HY2_HOPPING_LINK|HY2_HOPPING_ALIAS_LINK|HY2_OFFICIAL_LINK)=/' "$ENV_FILE" > "$tmp_env"
+awk '!/^(HY2_LINK|HY2_HOPPING_LINK|HY2_HOPPING_ALIAS_LINK|HY2_SINGLE_LINK|HY2_OFFICIAL_LINK|HY2_HAPP_LINK|HAPP_HYSTERIA_PORT)=/' "$ENV_FILE" > "$tmp_env"
 {
   printf 'HY2_LINK=%s\n' "$(env_value "$HY2_LINK")"
-  printf 'HY2_HOPPING_LINK=%s\n' "$(env_value "$HY2_HOPPING_LINK")"
+  printf 'HY2_SINGLE_LINK=%s\n' "$(env_value "$HY2_SINGLE_LINK")"
   printf 'HY2_OFFICIAL_LINK=%s\n' "$(env_value "$HY2_OFFICIAL_LINK")"
 } >> "$tmp_env"
 cat "$tmp_env" > "$ENV_FILE"
@@ -61,15 +61,15 @@ rm -f "$tmp_env"
 chmod 600 "$ENV_FILE"
 
 printf '%s\n' "$HY2_LINK" > /root/ultraxray-hy2-link.txt
-printf '%s\n' "$HY2_HOPPING_LINK" > /root/ultraxray-hy2-hopping-link.txt
+printf '%s\n' "$HY2_SINGLE_LINK" > /root/ultraxray-hy2-single-link.txt
 printf '%s\n' "$HY2_OFFICIAL_LINK" > /root/ultraxray-hy2-official-link.txt
 
 if command -v qrencode >/dev/null 2>&1; then
   printf '%s' "$HY2_LINK" | qrencode -o /root/ultraxray-hy2-qr.png
-  printf '%s' "$HY2_HOPPING_LINK" | qrencode -o /root/ultraxray-hy2-hopping-qr.png
+  printf '%s' "$HY2_SINGLE_LINK" | qrencode -o /root/ultraxray-hy2-single-qr.png
 fi
 
-echo "Hysteria 2 ссылка для Happ:"
+echo "Hysteria 2 Full ссылка:"
 echo
 printf '%s\n' "$HY2_LINK"
 echo
@@ -77,4 +77,5 @@ if command -v qrencode >/dev/null 2>&1; then
   printf '%s' "$HY2_LINK" | qrencode -t ANSIUTF8
 fi
 echo
-echo "Port Hopping ссылка сохранена в /root/ultraxray-hy2-hopping-link.txt"
+echo "Single-port ссылка сохранена в /root/ultraxray-hy2-single-link.txt"
+echo "Official URI сохранён в /root/ultraxray-hy2-official-link.txt"

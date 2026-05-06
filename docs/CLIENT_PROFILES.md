@@ -31,7 +31,7 @@ vless://UUID@SERVER_IP:443?encryption=VLESS_ENCRYPTION&type=xhttp&security=reali
 Формат:
 
 ```text
-hy2://PASSWORD@SERVER_IP:20000-50000/?insecure=1&obfs=salamander&obfs-password=OBFS_PASSWORD&sni=TARGET_HOST&pinSHA256=CERT_FINGERPRINT#UltraXRay-Hysteria2
+hy2://PASSWORD@SERVER_IP:20000-50000/?security=tls&insecure=1&obfs=salamander&obfs-password=OBFS_PASSWORD&sni=TARGET_HOST&mportHopInt=30#UltraXRay-Hysteria2-Full
 ```
 
 Параметры:
@@ -45,13 +45,21 @@ hy2://PASSWORD@SERVER_IP:20000-50000/?insecure=1&obfs=salamander&obfs-password=O
 | `obfs=salamander` | режим обфускации |
 | `obfs-password` | пароль Salamander |
 | `sni` | SNI Hysteria TLS |
-| `pinSHA256` | fingerprint сертификата без двоеточий, как в официальном `hysteria share` |
+| `mportHopInt=30` | интервал port hopping для клиентов, которые читают Happ-style параметр |
+
+Дополнительно сохраняется официальный URI:
+
+```text
+hysteria2://PASSWORD@SERVER_IP:20000-50000/?insecure=1&obfs=salamander&obfs-password=OBFS_PASSWORD&sni=TARGET_HOST&pinSHA256=CERT_FINGERPRINT#UltraXRay-Hysteria2-Official
+```
 
 ## Где Хранятся Ссылки
 
 ```text
 /root/ultraxray-vless-link.txt
 /root/ultraxray-hy2-link.txt
+/root/ultraxray-hy2-single-link.txt
+/root/ultraxray-hy2-official-link.txt
 ```
 
 QR-коды:
