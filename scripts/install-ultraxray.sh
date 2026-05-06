@@ -179,14 +179,12 @@ iptables -P OUTPUT ACCEPT 2>/dev/null || true
 ok "Старые сервисы, конфиги и firewall-правила очищены"
 
 step "Проверка TLS-хоста для REALITY"
-info "Использую ровно введённый SNI: ${TARGET_HOST}"
-info "Проверяю ${TARGET_HOST}:443 справочно, установка от результата не зависит"
-if check_tls_host "$TARGET_HOST" /tmp/ultraxray-target.log; then
+if echo | openssl s_client -connect "${TARGET_HOST}:443" -servername "${TARGET_HOST}" -verify_hostname "${TARGET_HOST}" >/tmp/ultraxray-target.log 2>&1; then
   ok "Сертификат ${TARGET_HOST} успешно проверен"
 else
-  warn "TLS-проверка ${TARGET_HOST} не прошла, но установка продолжится"
-  warn "REALITY будет настроен с SNI ${TARGET_HOST}, как указано пользователем"
-  sed -n '1,60p' /tmp/ultraxray-target.log || true
+  err "Проверка сертификата ${TARGET_HOST} не прошла"
+  sed -n '1,80p' /tmp/ultraxray-target.log || true
+  exit 1
 fi
 
 step "Установка Xray-core"
