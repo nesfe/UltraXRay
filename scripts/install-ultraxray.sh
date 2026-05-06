@@ -69,6 +69,16 @@ download_file() {
   curl -fL --show-error --connect-timeout 15 --max-time 180 --retry 3 --retry-delay 2 "$url" -o "$output"
 }
 
+check_tls_host() {
+  local host="$1"
+  local log_file="$2"
+  timeout 20 openssl s_client \
+    -connect "${host}:443" \
+    -servername "$host" \
+    -verify_hostname "$host" \
+    </dev/null >"$log_file" 2>&1
+}
+
 title
 printf "Установщик двухъядерной конфигурации Xray XHTTP REALITY и Hysteria 2\n"
 printf "Режим установки: полная пересборка proxy-стека на сервере\n"
@@ -169,13 +179,30 @@ iptables -P OUTPUT ACCEPT 2>/dev/null || true
 ok "Старые сервисы, конфиги и firewall-правила очищены"
 
 step "Проверка TLS-хоста для REALITY"
-info "Проверяю ${TARGET_HOST}:443, таймаут 15 секунд"
-if timeout 15 openssl s_client -connect "${TARGET_HOST}:443" -servername "${TARGET_HOST}" -verify_hostname "${TARGET_HOST}" -brief </dev/null >/tmp/ultraxray-target.log 2>&1; then
-  ok "Сертификат ${TARGET_HOST} успешно проверен"
+TLS_CHECK_HOST="$TARGET_HOST"
+TLS_CHECK_OK=0
+info "Проверяю ${TARGET_HOST}:443, таймаут 20 секунд"
+if check_tls_host "$TARGET_HOST" /tmp/ultraxray-target.log; then
+  TLS_CHECK_OK=1
 else
-  err "Проверка сертификата ${TARGET_HOST} не прошла"
-  sed -n '1,80p' /tmp/ultraxray-target.log || true
-  exit 1
+  if [[ "$TARGET_HOST" != www.* ]]; then
+    WWW_TARGET_HOST="www.${TARGET_HOST}"
+    info "Проверяю ${WWW_TARGET_HOST}:443 как fallback"
+    if check_tls_host "$WWW_TARGET_HOST" /tmp/ultraxray-target-www.log; then
+      TARGET_HOST="$WWW_TARGET_HOST"
+      TLS_CHECK_HOST="$WWW_TARGET_HOST"
+      TLS_CHECK_OK=1
+      warn "Для REALITY SNI будет использован ${TARGET_HOST}, потому что он прошёл TLS-проверку"
+    fi
+  fi
+fi
+
+if [[ "$TLS_CHECK_OK" == "1" ]]; then
+  ok "Сертификат ${TLS_CHECK_HOST} успешно проверен"
+else
+  warn "TLS-проверка ${TARGET_HOST} не прошла, установка продолжится"
+  warn "Если профиль Xray не подключится, выберите другой REALITY SNI или проверьте исходящий доступ VPS к ${TARGET_HOST}:443"
+  sed -n '1,60p' /tmp/ultraxray-target.log || true
 fi
 
 step "Установка Xray-core"

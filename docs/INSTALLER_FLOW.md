@@ -34,6 +34,8 @@ set -euo pipefail
 - `https://lemanapro.ru/` превращается в `lemanapro.ru`;
 - `lemanapro.ru:443/path` превращается в `lemanapro.ru`;
 - результат используется в `openssl s_client`, `realitySettings.serverNames`, `target`, Hysteria SNI и клиентских ссылках.
+- если TLS-проверка `lemanapro.ru` не проходит, установщик пробует `www.lemanapro.ru`;
+- если оба варианта не проходят, установка продолжается с предупреждением, чтобы временная исходящая сетевая проблема VPS не ломала весь bootstrap.
 
 ## Очистка
 
