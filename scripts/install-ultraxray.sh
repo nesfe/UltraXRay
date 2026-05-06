@@ -63,6 +63,12 @@ validate_hostname() {
   fi
 }
 
+download_file() {
+  local url="$1"
+  local output="$2"
+  curl -fL --show-error --connect-timeout 15 --max-time 180 --retry 3 --retry-delay 2 "$url" -o "$output"
+}
+
 title
 printf "Установщик двухъядерной конфигурации Xray XHTTP REALITY и Hysteria 2\n"
 printf "Режим установки: полная пересборка proxy-стека на сервере\n"
@@ -117,7 +123,7 @@ systemctl disable xray 2>/dev/null || true
 systemctl stop hysteria-server hysteria 2>/dev/null || true
 systemctl disable hysteria-server hysteria 2>/dev/null || true
 
-if curl -fsSL https://get.hy2.sh/ -o /tmp/ultraxray-get-hy2.sh 2>/dev/null; then
+if download_file https://get.hy2.sh/ /tmp/ultraxray-get-hy2.sh >/tmp/ultraxray-hy2-download.log 2>&1; then
   if bash /tmp/ultraxray-get-hy2.sh --remove >/tmp/ultraxray-hy2-remove.log 2>&1; then
     ok "Предыдущая установка Hysteria удалена"
     rm -f /tmp/ultraxray-hy2-remove.log
@@ -126,6 +132,10 @@ if curl -fsSL https://get.hy2.sh/ -o /tmp/ultraxray-get-hy2.sh 2>/dev/null; then
     tail -n 20 /tmp/ultraxray-hy2-remove.log || true
   fi
   rm -f /tmp/ultraxray-get-hy2.sh
+  rm -f /tmp/ultraxray-hy2-download.log
+else
+  warn "Не удалось скачать remover Hysteria, продолжаю ручную очистку"
+  sed -n '1,80p' /tmp/ultraxray-hy2-download.log || true
 fi
 
 rm -f /etc/systemd/system/hysteria-server.service \
@@ -159,7 +169,8 @@ iptables -P OUTPUT ACCEPT 2>/dev/null || true
 ok "Старые сервисы, конфиги и firewall-правила очищены"
 
 step "Проверка TLS-хоста для REALITY"
-if echo | openssl s_client -connect "${TARGET_HOST}:443" -servername "${TARGET_HOST}" -verify_hostname "${TARGET_HOST}" >/tmp/ultraxray-target.log 2>&1; then
+info "Проверяю ${TARGET_HOST}:443, таймаут 15 секунд"
+if timeout 15 openssl s_client -connect "${TARGET_HOST}:443" -servername "${TARGET_HOST}" -verify_hostname "${TARGET_HOST}" -brief </dev/null >/tmp/ultraxray-target.log 2>&1; then
   ok "Сертификат ${TARGET_HOST} успешно проверен"
 else
   err "Проверка сертификата ${TARGET_HOST} не прошла"
@@ -168,12 +179,20 @@ else
 fi
 
 step "Установка Xray-core"
-bash -c "$(curl -fsSL https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install
+info "Скачиваю официальный установщик Xray-core"
+download_file https://github.com/XTLS/Xray-install/raw/main/install-release.sh /tmp/ultraxray-xray-install.sh
+info "Запускаю установщик Xray-core"
+bash /tmp/ultraxray-xray-install.sh install
+rm -f /tmp/ultraxray-xray-install.sh
 test -x /usr/local/bin/xray
 ok "$(/usr/local/bin/xray version | head -1)"
 
 step "Установка Hysteria 2"
-HYSTERIA_USER=root bash <(curl -fsSL https://get.hy2.sh/)
+info "Скачиваю официальный установщик Hysteria 2"
+download_file https://get.hy2.sh/ /tmp/ultraxray-get-hy2.sh
+info "Запускаю установщик Hysteria 2"
+HYSTERIA_USER=root bash /tmp/ultraxray-get-hy2.sh
+rm -f /tmp/ultraxray-get-hy2.sh
 test -x /usr/local/bin/hysteria
 ok "$(/usr/local/bin/hysteria version | head -1)"
 
