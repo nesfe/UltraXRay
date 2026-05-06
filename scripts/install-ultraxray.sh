@@ -12,6 +12,7 @@ YELLOW='\033[1;33m'
 CYAN='\033[0;36m'
 BLUE='\033[0;34m'
 NC='\033[0m'
+ULTRAXRAY_VERSION="2026-05-06.4"
 
 title() { printf "\n${BLUE}UltraXRay${NC}\n"; }
 step() { printf "\n${CYAN}== %s ==${NC}\n\n" "$1"; }
@@ -82,6 +83,7 @@ check_tls_host() {
 title
 printf "Установщик двухъядерной конфигурации Xray XHTTP REALITY и Hysteria 2\n"
 printf "Режим установки: полная пересборка proxy-стека на сервере\n"
+printf "Версия установщика: %s\n" "$ULTRAXRAY_VERSION"
 
 TARGET_HOST_DEFAULT="www.mix.com"
 read -r -p "Домен или URL для маскировки REALITY SNI [${TARGET_HOST_DEFAULT}]: " TARGET_HOST_INPUT
