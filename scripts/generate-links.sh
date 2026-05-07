@@ -50,3 +50,18 @@ if [[ -n "${HY2_SINGLE_LINK:-}" ]]; then
     echo "qrencode не установлен. Установите пакет: apt-get install -y qrencode"
   fi
 fi
+
+if [[ -n "${HY2_HAPP_AUTH_LINK:-}" ]]; then
+  echo
+  echo "Hysteria 2 Happ auth-param ссылка:"
+  echo
+  printf '%s\n' "$HY2_HAPP_AUTH_LINK"
+  echo
+  echo "Hysteria 2 Happ auth-param QR-код:"
+  echo
+  if command -v qrencode >/dev/null 2>&1; then
+    printf '%s' "$HY2_HAPP_AUTH_LINK" | qrencode -t ANSIUTF8
+  else
+    echo "qrencode не установлен. Установите пакет: apt-get install -y qrencode"
+  fi
+fi

@@ -32,6 +32,7 @@ source "$ENV_FILE"
 
 require_var TARGET_HOST
 require_var HYSTERIA_PASSWORD
+require_var HYSTERIA_OBFS_PASSWORD
 
 if [[ ! -f /etc/hysteria/server.crt || ! -f /etc/hysteria/server.key ]]; then
   echo "Не найден сертификат Hysteria: /etc/hysteria/server.crt или /etc/hysteria/server.key"
@@ -45,6 +46,11 @@ tls:
   cert: /etc/hysteria/server.crt
   key: /etc/hysteria/server.key
   sniGuard: disable
+
+obfs:
+  type: salamander
+  salamander:
+    password: $(yaml_quote "$HYSTERIA_OBFS_PASSWORD")
 
 auth:
   type: password
@@ -60,7 +66,7 @@ quic:
   maxConnReceiveWindow: 20971520
   maxIdleTimeout: 30s
   keepAlivePeriod: 10s
-  disablePathMTUDiscovery: false
+  disablePathMTUDiscovery: true
 
 masquerade:
   type: proxy
@@ -76,4 +82,4 @@ systemctl is-active --quiet hysteria-server.service
 bash <(curl -fsSL https://raw.githubusercontent.com/nesfe/UltraXRay/main/scripts/fix-hy2-links.sh) "$ENV_FILE"
 
 echo
-echo "Hysteria 2 config rewritten without Salamander obfs and restarted."
+echo "Hysteria 2 config rewritten with Salamander obfs and restarted."

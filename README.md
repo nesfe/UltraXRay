@@ -9,7 +9,7 @@
 `UltraXRay` разворачивает два независимых proxy-ядра на одном VPS:
 
 - `Xray-core`: `VLESS + REALITY + XHTTP` на `443/tcp` с VLESS Encryption, сгенерированной через `xray vlessenc`;
-- `Hysteria 2`: UDP-транспорт с port hopping в диапазоне `20000-50000/udp`.
+- `Hysteria 2`: UDP-транспорт с `Salamander` obfuscation и port hopping в диапазоне `20000-50000/udp`.
 
 Проект сохраняет стиль `ClearXRay`: строгий `bash`, цветной пошаговый вывод, полная очистка старого proxy-стека, `systemd`, `ufw`, сохранение доступов, готовые ссылки и QR-коды.
 
@@ -40,8 +40,9 @@
 `Hysteria 2` используется как отдельный UDP-профиль:
 
 - port hopping `20000-50000/udp`;
+- `Salamander` obfuscation с отдельным случайным паролем;
 - самоподписанный сертификат;
-- Happ-compatible `hy2://` QR без Salamander obfs;
+- Happ-compatible `hy2://` QR с альтернативным `auth=` query-параметром;
 - `pinSHA256` в official URI для клиентов, которые корректно импортируют pin.
 
 ## Сетевая схема
@@ -143,20 +144,23 @@ vless://UUID@SERVER_IP:443?encryption=VLESS_ENCRYPTION&type=xhttp&security=reali
 Типовая ссылка выглядит так:
 
 ```text
-hy2://PASSWORD@SERVER_IP:20000-50000/?security=tls&insecure=1&sni=TARGET_HOST&mportHopInt=30#UltraXRay-Hysteria2-Full
+hy2://PASSWORD@SERVER_IP:20000-50000/?security=tls&insecure=1&obfs=salamander&obfs-password=OBFS_PASSWORD&sni=TARGET_HOST&mportHopInt=30#UltraXRay-Hysteria2-Full
 ```
 
 Ключевые параметры:
 
 - `20000-50000` — multi-port/port hopping диапазон;
+- `obfs=salamander` — включение Salamander obfuscation;
+- `obfs-password` — отдельный пароль обфускации;
 - `insecure=1` — требуется из-за self-signed сертификата;
 - `mportHopInt=30` — интервал port hopping для клиентов, которые поддерживают этот параметр;
 - `sni` — тот же домен, что указан пользователем при установке.
 
 Установщик сохраняет несколько URI для одного и того же полноценного Hysteria 2 сервера:
 
-- `/root/ultraxray-hy2-link.txt` — `hy2://` с `20000-50000` и `mportHopInt=30`;
-- `/root/ultraxray-hy2-single-link.txt` — тот же Hysteria 2, но на одном порту `20000` для клиентов, которые режут multi-port URI;
+- `/root/ultraxray-hy2-link.txt` — `hy2://` с `20000-50000`, Salamander и `mportHopInt=30`;
+- `/root/ultraxray-hy2-happ-auth-link.txt` — Happ-style `hy2://` с `auth=` в query;
+- `/root/ultraxray-hy2-single-link.txt` — тот же Hysteria 2 + Salamander, но на одном порту `20000` для клиентов, которые режут multi-port URI;
 - `/root/ultraxray-hy2-official-link.txt` — официальный `hysteria2://` URI с `pinSHA256`.
 
 ## Повторный вывод ссылок

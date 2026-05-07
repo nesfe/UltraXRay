@@ -31,7 +31,7 @@ vless://UUID@SERVER_IP:443?encryption=VLESS_ENCRYPTION&type=xhttp&security=reali
 Формат:
 
 ```text
-hy2://PASSWORD@SERVER_IP:20000-50000/?security=tls&insecure=1&sni=TARGET_HOST&mportHopInt=30#UltraXRay-Hysteria2-Full
+hy2://PASSWORD@SERVER_IP:20000-50000/?security=tls&insecure=1&obfs=salamander&obfs-password=OBFS_PASSWORD&sni=TARGET_HOST&mportHopInt=30#UltraXRay-Hysteria2-Full
 ```
 
 Параметры:
@@ -42,13 +42,15 @@ hy2://PASSWORD@SERVER_IP:20000-50000/?security=tls&insecure=1&sni=TARGET_HOST&mp
 | `SERVER_IP` | публичный IP VPS |
 | `20000-50000` | port hopping range |
 | `insecure=1` | разрешение self-signed cert |
+| `obfs=salamander` | режим обфускации |
+| `obfs-password` | пароль Salamander |
 | `sni` | SNI Hysteria TLS |
 | `mportHopInt=30` | интервал port hopping для клиентов, которые читают Happ-style параметр |
 
 Дополнительно сохраняется официальный URI:
 
 ```text
-hysteria2://PASSWORD@SERVER_IP:20000-50000/?insecure=1&sni=TARGET_HOST&pinSHA256=CERT_FINGERPRINT#UltraXRay-Hysteria2-Official
+hysteria2://PASSWORD@SERVER_IP:20000-50000/?insecure=1&obfs=salamander&obfs-password=OBFS_PASSWORD&sni=TARGET_HOST&pinSHA256=CERT_FINGERPRINT#UltraXRay-Hysteria2-Official
 ```
 
 ## Где Хранятся Ссылки
@@ -56,6 +58,7 @@ hysteria2://PASSWORD@SERVER_IP:20000-50000/?insecure=1&sni=TARGET_HOST&pinSHA256
 ```text
 /root/ultraxray-vless-link.txt
 /root/ultraxray-hy2-link.txt
+/root/ultraxray-hy2-happ-auth-link.txt
 /root/ultraxray-hy2-single-link.txt
 /root/ultraxray-hy2-official-link.txt
 ```

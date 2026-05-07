@@ -340,7 +340,7 @@ chmod 600 /etc/hysteria/server.key
 
 HYSTERIA_CERT_FINGERPRINT="$(openssl x509 -noout -fingerprint -sha256 -in /etc/hysteria/server.crt | sed 's/^sha256 Fingerprint=//; s/^SHA256 Fingerprint=//')"
 HYSTERIA_PIN_SHA256="$(printf '%s' "$HYSTERIA_CERT_FINGERPRINT" | tr -d ':' | tr '[:upper:]' '[:lower:]')"
-HYSTERIA_OBFS_PASSWORD=""
+HYSTERIA_OBFS_PASSWORD="$(openssl rand -base64 24 | tr '+/' '-_' | tr -d '=')"
 
 cat > /etc/hysteria/config.yaml <<EOF
 listen: :20000-50000
@@ -349,6 +349,11 @@ tls:
   cert: /etc/hysteria/server.crt
   key: /etc/hysteria/server.key
   sniGuard: disable
+
+obfs:
+  type: salamander
+  salamander:
+    password: $(yaml_quote "$HYSTERIA_OBFS_PASSWORD")
 
 auth:
   type: password
@@ -364,27 +369,17 @@ quic:
   maxConnReceiveWindow: 20971520
   maxIdleTimeout: 30s
   keepAlivePeriod: 10s
-  disablePathMTUDiscovery: false
-
-congestion:
-  type: bbr
-  bbrProfile: standard
-
-sniff:
-  enable: true
-  timeout: 2s
-  rewriteDomain: false
-  tcpPorts: 80,443
-  udpPorts: all
+  disablePathMTUDiscovery: true
 
 masquerade:
-  type: file
-  file:
-    dir: /var/www/ultraxray-masq
+  type: proxy
+  proxy:
+    url: https://${TARGET_HOST}/
+    rewriteHost: true
 EOF
 
 ok "Конфиг Hysteria 2 записан"
-ok "Hysteria 2 работает без Salamander obfs для совместимости с Happ QR-import"
+ok "Hysteria Salamander password: ${HYSTERIA_OBFS_PASSWORD}"
 
 step "Настройка firewall"
 ufw --force reset
@@ -421,9 +416,10 @@ fi
 
 step "Сохранение доступов"
 VLESS_LINK="vless://${XRAY_UUID}@${SERVER_IP}:443?encryption=$(urlencode "$VLESS_ENCRYPTION")&type=xhttp&security=reality&sni=$(urlencode "$TARGET_HOST")&fp=chrome&pbk=$(urlencode "$REALITY_PUBLIC_KEY")&sid=${REALITY_SHORT_ID}&path=$(urlencode "$XHTTP_PATH")&mode=packet-up&spx=$(urlencode "$SPIDER_X")#UltraXRay-XHTTP-REALITY"
-HY2_LINK="hy2://$(urlencode "$HYSTERIA_PASSWORD")@${SERVER_IP}:20000-50000/?security=tls&insecure=1&sni=$(urlencode "$TARGET_HOST")&mportHopInt=30#UltraXRay-Hysteria2-Full"
-HY2_SINGLE_LINK="hy2://$(urlencode "$HYSTERIA_PASSWORD")@${SERVER_IP}:20000/?security=tls&insecure=1&sni=$(urlencode "$TARGET_HOST")#UltraXRay-Hysteria2-SinglePort"
-HY2_OFFICIAL_LINK="hysteria2://$(urlencode "$HYSTERIA_PASSWORD")@${SERVER_IP}:20000-50000/?insecure=1&sni=$(urlencode "$TARGET_HOST")&pinSHA256=$(urlencode "$HYSTERIA_PIN_SHA256")#UltraXRay-Hysteria2-Official"
+HY2_LINK="hy2://$(urlencode "$HYSTERIA_PASSWORD")@${SERVER_IP}:20000-50000/?security=tls&insecure=1&obfs=salamander&obfs-password=$(urlencode "$HYSTERIA_OBFS_PASSWORD")&sni=$(urlencode "$TARGET_HOST")&mportHopInt=30#UltraXRay-Hysteria2-Full"
+HY2_HAPP_AUTH_LINK="hy2://${SERVER_IP}:20000-50000/?auth=$(urlencode "$HYSTERIA_PASSWORD")&security=tls&insecure=1&obfs=salamander&obfs-password=$(urlencode "$HYSTERIA_OBFS_PASSWORD")&sni=$(urlencode "$TARGET_HOST")&mportHopInt=30#UltraXRay-Hysteria2-HappAuth"
+HY2_SINGLE_LINK="hy2://$(urlencode "$HYSTERIA_PASSWORD")@${SERVER_IP}:20000/?security=tls&insecure=1&obfs=salamander&obfs-password=$(urlencode "$HYSTERIA_OBFS_PASSWORD")&sni=$(urlencode "$TARGET_HOST")#UltraXRay-Hysteria2-SinglePort"
+HY2_OFFICIAL_LINK="hysteria2://$(urlencode "$HYSTERIA_PASSWORD")@${SERVER_IP}:20000-50000/?insecure=1&obfs=salamander&obfs-password=$(urlencode "$HYSTERIA_OBFS_PASSWORD")&sni=$(urlencode "$TARGET_HOST")&pinSHA256=$(urlencode "$HYSTERIA_PIN_SHA256")#UltraXRay-Hysteria2-Official"
 
 cat > /root/ultraproxy.env <<EOF
 SERVER_IP=$(env_value "$SERVER_IP")
@@ -442,6 +438,7 @@ HYSTERIA_CERT_FINGERPRINT=$(env_value "$HYSTERIA_CERT_FINGERPRINT")
 HYSTERIA_PIN_SHA256=$(env_value "$HYSTERIA_PIN_SHA256")
 VLESS_LINK=$(env_value "$VLESS_LINK")
 HY2_LINK=$(env_value "$HY2_LINK")
+HY2_HAPP_AUTH_LINK=$(env_value "$HY2_HAPP_AUTH_LINK")
 HY2_SINGLE_LINK=$(env_value "$HY2_SINGLE_LINK")
 HY2_OFFICIAL_LINK=$(env_value "$HY2_OFFICIAL_LINK")
 EOF
@@ -449,10 +446,12 @@ chmod 600 /root/ultraproxy.env
 
 printf '%s\n' "$VLESS_LINK" > /root/ultraxray-vless-link.txt
 printf '%s\n' "$HY2_LINK" > /root/ultraxray-hy2-link.txt
+printf '%s\n' "$HY2_HAPP_AUTH_LINK" > /root/ultraxray-hy2-happ-auth-link.txt
 printf '%s\n' "$HY2_SINGLE_LINK" > /root/ultraxray-hy2-single-link.txt
 printf '%s\n' "$HY2_OFFICIAL_LINK" > /root/ultraxray-hy2-official-link.txt
 printf '%s' "$VLESS_LINK" | qrencode -o /root/ultraxray-vless-qr.png
 printf '%s' "$HY2_LINK" | qrencode -o /root/ultraxray-hy2-qr.png
+printf '%s' "$HY2_HAPP_AUTH_LINK" | qrencode -o /root/ultraxray-hy2-happ-auth-qr.png
 printf '%s' "$HY2_SINGLE_LINK" | qrencode -o /root/ultraxray-hy2-single-qr.png
 
 ok "Сохранён /root/ultraproxy.env"
@@ -460,13 +459,15 @@ ok "Сохранён /root/ultraxray-vless-link.txt"
 ok "Сохранён /root/ultraxray-vless-qr.png"
 ok "Сохранён /root/ultraxray-hy2-link.txt"
 ok "Сохранён /root/ultraxray-hy2-qr.png"
+ok "Сохранён /root/ultraxray-hy2-happ-auth-link.txt"
+ok "Сохранён /root/ultraxray-hy2-happ-auth-qr.png"
 ok "Сохранён /root/ultraxray-hy2-single-link.txt"
 ok "Сохранён /root/ultraxray-hy2-single-qr.png"
 
 step "Результат установки"
 info "Xray: VLESS + REALITY + XHTTP + VLESS Encryption"
 info "Xray port: 443/tcp"
-info "Hysteria 2: UDP port hopping"
+info "Hysteria 2: Salamander + UDP port hopping"
 info "Hysteria UDP range: 20000-50000/udp"
 info "Файл доступов: /root/ultraproxy.env"
 
