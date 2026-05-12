@@ -26,6 +26,16 @@ vless://UUID@SERVER_IP:443?encryption=VLESS_ENCRYPTION&type=xhttp&security=reali
 | `mode=packet-up` | XHTTP mode |
 | `spx` | Reality spiderX |
 
+## VLESS Vision REALITY
+
+Формат:
+
+```text
+vless://UUID@SERVER_IP:8443?encryption=none&type=tcp&security=reality&sni=TARGET_HOST&fp=chrome&pbk=PUBLIC_KEY&sid=SHORT_ID&flow=xtls-rprx-vision#UltraXRay-Vision-REALITY
+```
+
+Этот профиль предназначен для клиентов, которые поддерживают REALITY/Vision, но нестабильно работают с `XHTTP` или `VLESS Encryption`.
+
 ## Hysteria 2
 
 Формат:

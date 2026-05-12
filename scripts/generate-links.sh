@@ -23,6 +23,21 @@ else
   echo "qrencode не установлен. Установите пакет: apt-get install -y qrencode"
 fi
 
+if [[ -n "${VLESS_VISION_LINK:-}" ]]; then
+  echo
+  echo "VLESS Vision REALITY fallback ссылка:"
+  echo
+  printf '%s\n' "$VLESS_VISION_LINK"
+  echo
+  echo "VLESS Vision fallback QR-код:"
+  echo
+  if command -v qrencode >/dev/null 2>&1; then
+    printf '%s' "$VLESS_VISION_LINK" | qrencode -t ANSIUTF8
+  else
+    echo "qrencode не установлен. Установите пакет: apt-get install -y qrencode"
+  fi
+fi
+
 echo
 echo "Hysteria 2 Full ссылка:"
 echo

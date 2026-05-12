@@ -36,6 +36,7 @@
 - `XHTTP` вместо старого `raw tcp`/`ws`;
 - отдельный случайный `path`;
 - VLESS Encryption с ML-KEM-768-профилем, сгенерированным штатной командой `xray vlessenc`.
+- совместимый fallback `VLESS + REALITY + Vision` на `8443/tcp` для клиентов без стабильной поддержки XHTTP/VLESS Encryption.
 
 `Hysteria 2` используется как отдельный UDP-профиль:
 
@@ -53,6 +54,7 @@
 | --- | --- | --- | --- |
 | `22/tcp` | SSH | OpenSSH | администрирование |
 | `443/tcp` | TCP | Xray-core | `VLESS + REALITY + XHTTP` |
+| `8443/tcp` | TCP | Xray-core | `VLESS + REALITY + Vision` fallback |
 | `20000-50000/udp` | UDP | Hysteria 2 | port hopping |
 
 Firewall настраивается через `ufw`. Входящие соединения по умолчанию запрещаются, открываются только перечисленные порты.
@@ -138,6 +140,16 @@ vless://UUID@SERVER_IP:443?encryption=VLESS_ENCRYPTION&type=xhttp&security=reali
 - `encryption` — клиентская часть VLESS Encryption, сгенерированная `xray vlessenc`;
 - `path` — случайный HTTP path;
 - `spx` — Reality spiderX path.
+
+### VLESS Vision REALITY
+
+Совместимый fallback-профиль сохраняется отдельно:
+
+```text
+vless://UUID@SERVER_IP:8443?encryption=none&type=tcp&security=reality&sni=TARGET_HOST&fp=chrome&pbk=PUBLIC_KEY&sid=SHORT_ID&flow=xtls-rprx-vision#UltraXRay-Vision-REALITY
+```
+
+Он использует отдельные `UUID`, REALITY keypair и `shortId`, чтобы не смешивать основной XHTTP-профиль с fallback.
 
 ### Hysteria 2
 

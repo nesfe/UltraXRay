@@ -99,7 +99,7 @@ read -r -s -p "Пароль для Hysteria 2 [оставьте пустым д�
 printf "\n"
 
 warn "Будут удалены старые Xray/Hysteria, очищены iptables и сброшен UFW."
-warn "Xray займёт 443/tcp, Hysteria 2 займёт 20000-50000/udp."
+warn "Xray займёт 443/tcp и 8443/tcp, Hysteria 2 займёт 20000-50000/udp."
 
 step "Установка базовых зависимостей"
 DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a apt-get update -qq
@@ -165,6 +165,8 @@ rm -rf /usr/local/etc/xray \
   /root/ultraproxy.env \
   /root/ultraxray-vless-link.txt \
   /root/ultraxray-vless-qr.png \
+  /root/ultraxray-vless-vision-link.txt \
+  /root/ultraxray-vless-vision-qr.png \
   /root/ultraxray-hy2-link.txt \
   /root/ultraxray-hy2-single-link.txt \
   /root/ultraxray-hy2-official-link.txt \
@@ -172,6 +174,7 @@ rm -rf /usr/local/etc/xray \
   /root/ultraxray-hy2-qr.png 2>/dev/null || true
 
 fuser -k 443/tcp 2>/dev/null || true
+fuser -k 8443/tcp 2>/dev/null || true
 fuser -k 20000/udp 2>/dev/null || true
 fuser -k 51000/udp 2>/dev/null || true
 
@@ -222,6 +225,12 @@ REALITY_PUBLIC_KEY="$(awk -F': ' '/Password \(PublicKey\)/ {print $2}' <<<"$REAL
 REALITY_SHORT_ID="$(openssl rand -hex 8)"
 XHTTP_PATH="/api/$(openssl rand -hex 6)/events"
 SPIDER_X="/assets/$(openssl rand -hex 4)"
+VISION_PORT="8443"
+VISION_UUID="$("/usr/local/bin/xray" uuid)"
+VISION_KEYS="$("/usr/local/bin/xray" x25519 2>&1)"
+VISION_PRIVATE_KEY="$(awk -F': ' '/PrivateKey/ {print $2}' <<<"$VISION_KEYS")"
+VISION_PUBLIC_KEY="$(awk -F': ' '/Password \(PublicKey\)/ {print $2}' <<<"$VISION_KEYS")"
+VISION_SHORT_ID="$(openssl rand -hex 8)"
 
 VLESS_ENC_OUTPUT="$("/usr/local/bin/xray" vlessenc)"
 VLESS_DECRYPTION="$(awk '/Authentication: ML-KEM-768/{flag=1; next} flag && /"decryption":/{gsub(/.*"decryption": "/,""); gsub(/".*/,""); print; exit}' <<<"$VLESS_ENC_OUTPUT")"
@@ -232,6 +241,10 @@ require_nonempty "XRAY_UUID" "$XRAY_UUID"
 require_nonempty "REALITY_PRIVATE_KEY" "$REALITY_PRIVATE_KEY"
 require_nonempty "REALITY_PUBLIC_KEY" "$REALITY_PUBLIC_KEY"
 require_nonempty "REALITY_SHORT_ID" "$REALITY_SHORT_ID"
+require_nonempty "VISION_UUID" "$VISION_UUID"
+require_nonempty "VISION_PRIVATE_KEY" "$VISION_PRIVATE_KEY"
+require_nonempty "VISION_PUBLIC_KEY" "$VISION_PUBLIC_KEY"
+require_nonempty "VISION_SHORT_ID" "$VISION_SHORT_ID"
 require_nonempty "VLESS_DECRYPTION" "$VLESS_DECRYPTION"
 require_nonempty "VLESS_ENCRYPTION" "$VLESS_ENCRYPTION"
 
@@ -240,6 +253,10 @@ ok "Xray UUID: ${XRAY_UUID}"
 ok "REALITY PublicKey: ${REALITY_PUBLIC_KEY}"
 ok "REALITY Short ID: ${REALITY_SHORT_ID}"
 ok "XHTTP path: ${XHTTP_PATH}"
+ok "Vision fallback port: ${VISION_PORT}"
+ok "Vision UUID: ${VISION_UUID}"
+ok "Vision PublicKey: ${VISION_PUBLIC_KEY}"
+ok "Vision Short ID: ${VISION_SHORT_ID}"
 ok "VLESS Encryption: ML-KEM-768 профиль сгенерирован"
 
 step "Запись конфигурации Xray"
@@ -280,6 +297,41 @@ cat > /usr/local/etc/xray/config.json <<EOF
           "privateKey": "${REALITY_PRIVATE_KEY}",
           "shortIds": [
             "${REALITY_SHORT_ID}"
+          ]
+        }
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": ["http", "tls", "quic"]
+      }
+    },
+    {
+      "listen": "0.0.0.0",
+      "port": ${VISION_PORT},
+      "protocol": "vless",
+      "settings": {
+        "clients": [
+          {
+            "id": "${VISION_UUID}",
+            "flow": "xtls-rprx-vision",
+            "email": "ultraxray-vision"
+          }
+        ],
+        "decryption": "none"
+      },
+      "streamSettings": {
+        "network": "raw",
+        "security": "reality",
+        "realitySettings": {
+          "show": false,
+          "target": "${TARGET_HOST}:443",
+          "xver": 0,
+          "serverNames": [
+            "${TARGET_HOST}"
+          ],
+          "privateKey": "${VISION_PRIVATE_KEY}",
+          "shortIds": [
+            "${VISION_SHORT_ID}"
           ]
         }
       },
@@ -387,6 +439,7 @@ ufw default deny incoming
 ufw default allow outgoing
 ufw allow 22/tcp comment 'SSH'
 ufw allow 443/tcp comment 'Xray VLESS XHTTP REALITY'
+ufw allow 8443/tcp comment 'Xray VLESS Vision REALITY fallback'
 ufw allow 20000:50000/udp comment 'Hysteria 2 UDP port hopping'
 ufw --force enable
 ok "UFW настроен"
@@ -408,6 +461,13 @@ else
   exit 1
 fi
 
+if ss -ltnp | grep -q ':8443'; then
+  ok "8443/tcp слушает Xray Vision fallback"
+else
+  err "8443/tcp не слушает"
+  exit 1
+fi
+
 if ss -lunp | grep -Eq ':(20000|[2-4][0-9]{4}|50000)'; then
   ok "UDP port hopping диапазон Hysteria активен"
 else
@@ -416,6 +476,7 @@ fi
 
 step "Сохранение доступов"
 VLESS_LINK="vless://${XRAY_UUID}@${SERVER_IP}:443?encryption=$(urlencode "$VLESS_ENCRYPTION")&type=xhttp&security=reality&sni=$(urlencode "$TARGET_HOST")&fp=chrome&pbk=$(urlencode "$REALITY_PUBLIC_KEY")&sid=${REALITY_SHORT_ID}&path=$(urlencode "$XHTTP_PATH")&mode=packet-up&spx=$(urlencode "$SPIDER_X")#UltraXRay-XHTTP-REALITY"
+VLESS_VISION_LINK="vless://${VISION_UUID}@${SERVER_IP}:${VISION_PORT}?encryption=none&type=tcp&security=reality&sni=$(urlencode "$TARGET_HOST")&fp=chrome&pbk=$(urlencode "$VISION_PUBLIC_KEY")&sid=${VISION_SHORT_ID}&flow=xtls-rprx-vision#UltraXRay-Vision-REALITY"
 HY2_LINK="hy2://$(urlencode "$HYSTERIA_PASSWORD")@${SERVER_IP}:20000-50000/?security=tls&insecure=1&obfs=salamander&obfs-password=$(urlencode "$HYSTERIA_OBFS_PASSWORD")&sni=$(urlencode "$TARGET_HOST")&mportHopInt=30#UltraXRay-Hysteria2-Full"
 HY2_HAPP_AUTH_LINK="hy2://${SERVER_IP}:20000-50000/?auth=$(urlencode "$HYSTERIA_PASSWORD")&security=tls&insecure=1&obfs=salamander&obfs-password=$(urlencode "$HYSTERIA_OBFS_PASSWORD")&sni=$(urlencode "$TARGET_HOST")&mportHopInt=30#UltraXRay-Hysteria2-HappAuth"
 HY2_SINGLE_LINK="hy2://$(urlencode "$HYSTERIA_PASSWORD")@${SERVER_IP}:20000/?security=tls&insecure=1&obfs=salamander&obfs-password=$(urlencode "$HYSTERIA_OBFS_PASSWORD")&sni=$(urlencode "$TARGET_HOST")#UltraXRay-Hysteria2-SinglePort"
@@ -432,11 +493,17 @@ XHTTP_PATH=$(env_value "$XHTTP_PATH")
 SPIDER_X=$(env_value "$SPIDER_X")
 VLESS_DECRYPTION=$(env_value "$VLESS_DECRYPTION")
 VLESS_ENCRYPTION=$(env_value "$VLESS_ENCRYPTION")
+VISION_PORT=$(env_value "$VISION_PORT")
+VISION_UUID=$(env_value "$VISION_UUID")
+VISION_PRIVATE_KEY=$(env_value "$VISION_PRIVATE_KEY")
+VISION_PUBLIC_KEY=$(env_value "$VISION_PUBLIC_KEY")
+VISION_SHORT_ID=$(env_value "$VISION_SHORT_ID")
 HYSTERIA_PASSWORD=$(env_value "$HYSTERIA_PASSWORD")
 HYSTERIA_OBFS_PASSWORD=$(env_value "$HYSTERIA_OBFS_PASSWORD")
 HYSTERIA_CERT_FINGERPRINT=$(env_value "$HYSTERIA_CERT_FINGERPRINT")
 HYSTERIA_PIN_SHA256=$(env_value "$HYSTERIA_PIN_SHA256")
 VLESS_LINK=$(env_value "$VLESS_LINK")
+VLESS_VISION_LINK=$(env_value "$VLESS_VISION_LINK")
 HY2_LINK=$(env_value "$HY2_LINK")
 HY2_HAPP_AUTH_LINK=$(env_value "$HY2_HAPP_AUTH_LINK")
 HY2_SINGLE_LINK=$(env_value "$HY2_SINGLE_LINK")
@@ -445,11 +512,13 @@ EOF
 chmod 600 /root/ultraproxy.env
 
 printf '%s\n' "$VLESS_LINK" > /root/ultraxray-vless-link.txt
+printf '%s\n' "$VLESS_VISION_LINK" > /root/ultraxray-vless-vision-link.txt
 printf '%s\n' "$HY2_LINK" > /root/ultraxray-hy2-link.txt
 printf '%s\n' "$HY2_HAPP_AUTH_LINK" > /root/ultraxray-hy2-happ-auth-link.txt
 printf '%s\n' "$HY2_SINGLE_LINK" > /root/ultraxray-hy2-single-link.txt
 printf '%s\n' "$HY2_OFFICIAL_LINK" > /root/ultraxray-hy2-official-link.txt
 printf '%s' "$VLESS_LINK" | qrencode -o /root/ultraxray-vless-qr.png
+printf '%s' "$VLESS_VISION_LINK" | qrencode -o /root/ultraxray-vless-vision-qr.png
 printf '%s' "$HY2_LINK" | qrencode -o /root/ultraxray-hy2-qr.png
 printf '%s' "$HY2_HAPP_AUTH_LINK" | qrencode -o /root/ultraxray-hy2-happ-auth-qr.png
 printf '%s' "$HY2_SINGLE_LINK" | qrencode -o /root/ultraxray-hy2-single-qr.png
@@ -457,6 +526,8 @@ printf '%s' "$HY2_SINGLE_LINK" | qrencode -o /root/ultraxray-hy2-single-qr.png
 ok "Сохранён /root/ultraproxy.env"
 ok "Сохранён /root/ultraxray-vless-link.txt"
 ok "Сохранён /root/ultraxray-vless-qr.png"
+ok "Сохранён /root/ultraxray-vless-vision-link.txt"
+ok "Сохранён /root/ultraxray-vless-vision-qr.png"
 ok "Сохранён /root/ultraxray-hy2-link.txt"
 ok "Сохранён /root/ultraxray-hy2-qr.png"
 ok "Сохранён /root/ultraxray-hy2-happ-auth-link.txt"
@@ -467,6 +538,7 @@ ok "Сохранён /root/ultraxray-hy2-single-qr.png"
 step "Результат установки"
 info "Xray: VLESS + REALITY + XHTTP + VLESS Encryption"
 info "Xray port: 443/tcp"
+info "Xray fallback: VLESS + REALITY + Vision на 8443/tcp"
 info "Hysteria 2: Salamander + UDP port hopping"
 info "Hysteria UDP range: 20000-50000/udp"
 info "Файл доступов: /root/ultraproxy.env"
@@ -475,6 +547,11 @@ printf "\n${GREEN}VLESS XHTTP REALITY ссылка${NC}\n\n"
 cat /root/ultraxray-vless-link.txt
 printf "\n\n${GREEN}VLESS QR-код${NC}\n\n"
 printf '%s' "$VLESS_LINK" | qrencode -t ANSIUTF8
+
+printf "\n\n${GREEN}VLESS Vision REALITY fallback ссылка${NC}\n\n"
+cat /root/ultraxray-vless-vision-link.txt
+printf "\n\n${GREEN}VLESS Vision fallback QR-код${NC}\n\n"
+printf '%s' "$VLESS_VISION_LINK" | qrencode -t ANSIUTF8
 
 printf "\n\n${GREEN}Hysteria 2 Full ссылка${NC}\n\n"
 cat /root/ultraxray-hy2-link.txt
