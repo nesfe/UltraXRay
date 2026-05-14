@@ -11,8 +11,6 @@
 - `Xray-core`: `VLESS + REALITY + XHTTP` на `443/tcp` с VLESS Encryption, сгенерированной через `xray vlessenc`;
 - `Hysteria 2`: UDP-транспорт с `Salamander` obfuscation и port hopping в диапазоне `20000-50000/udp`.
 
-Проект сохраняет стиль `ClearXRay`: строгий `bash`, цветной пошаговый вывод, полная очистка старого proxy-стека, `systemd`, `ufw`, сохранение доступов, готовые ссылки и QR-коды.
-
 ## Содержание
 
 - [Зачем два ядра](#зачем-два-ядра)
