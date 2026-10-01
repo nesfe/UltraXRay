@@ -1,81 +1,39 @@
-# Клиентские Профили
+# Клиентские профили
 
-## VLESS XHTTP REALITY
-
-Формат:
+## XHTTP REALITY
 
 ```text
 vless://UUID@SERVER_IP:443?encryption=VLESS_ENCRYPTION&type=xhttp&security=reality&sni=TARGET_HOST&fp=chrome&pbk=PUBLIC_KEY&sid=SHORT_ID&path=XHTTP_PATH&mode=packet-up&spx=SPIDER_X#UltraXRay-XHTTP-REALITY
 ```
 
-Параметры:
+Клиент должен поддерживать XHTTP и VLESS Encryption. При импорте должны сохраняться encryption, path, mode, SNI, public key и shortId.
 
-| Параметр | Значение |
-| --- | --- |
-| `UUID` | идентификатор клиента VLESS |
-| `SERVER_IP` | публичный IP VPS |
-| `443` | порт Xray |
-| `encryption` | VLESS Encryption client string |
-| `type=xhttp` | транспорт XHTTP |
-| `security=reality` | REALITY handshake |
-| `sni` | домен маскировки |
-| `fp=chrome` | TLS fingerprint клиента |
-| `pbk` | REALITY public key |
-| `sid` | REALITY shortId |
-| `path` | XHTTP path |
-| `mode=packet-up` | XHTTP mode |
-| `spx` | Reality spiderX |
-
-## VLESS Vision REALITY
-
-Формат:
+## Vision REALITY и Vision EDGE
 
 ```text
 vless://UUID@SERVER_IP:8443?encryption=none&type=tcp&security=reality&sni=TARGET_HOST&fp=chrome&pbk=PUBLIC_KEY&sid=SHORT_ID&flow=xtls-rprx-vision#UltraXRay-Vision-REALITY
+vless://UUID@SERVER_IP:8443?encryption=none&type=tcp&security=reality&sni=TARGET_HOST&fp=edge&pbk=PUBLIC_KEY&sid=SHORT_ID&flow=xtls-rprx-vision#UltraXRay-Vision-EDGE-REALITY
 ```
 
-Этот профиль предназначен для клиентов, которые поддерживают REALITY/Vision, но нестабильно работают с `XHTTP` или `VLESS Encryption`.
+Это два клиентских представления одного серверного inbound. UUID, ключи, SNI, shortId и порт совпадают. Дополнительные порты или перезапуск не требуются.
+
+Генератор `python3 scripts/add-vision-edge.py` сохраняет исходную ссылку и все её параметры, кроме fingerprint и отображаемого имени. Есть режим `--print-only` без записи файлов. `scripts/generate-links.sh` умеет выводить Edge из старого env, содержащего VLESS_VISION_LINK.
+
+Проверенная серверная версия нового установщика — Xray 26.6.27. После обновления ядра совместимость fingerprint нужно проверять заново; не считать Edge универсальным для всех последующих REALITY-реализаций.
 
 ## Hysteria 2
 
-Формат:
+Новые установки используют один порт:
 
 ```text
-hy2://PASSWORD@SERVER_IP:20000-50000/?security=tls&insecure=1&obfs=salamander&obfs-password=OBFS_PASSWORD&sni=TARGET_HOST&mportHopInt=30#UltraXRay-Hysteria2-Full
+hy2://PASSWORD@SERVER_IP:20000/?security=tls&insecure=1&obfs=salamander&obfs-password=OBFS_PASSWORD&sni=TARGET_HOST#UltraXRay-Hysteria2
+hysteria2://PASSWORD@SERVER_IP:20000/?insecure=1&obfs=salamander&obfs-password=OBFS_PASSWORD&sni=TARGET_HOST&pinSHA256=CERT_FINGERPRINT#UltraXRay-Hysteria2-Official
 ```
 
-Параметры:
+Также сохраняются вариант с `auth=` для совместимых импортёров и single-port alias. Для самоподписанного сертификата предпочтителен клиент, который действительно проверяет `pinSHA256`. Некоторые приложения не принимают `insecure` или по-разному импортируют пароли и pin; факт импорта не подтверждает работоспособность.
 
-| Параметр | Значение |
-| --- | --- |
-| `PASSWORD` | пароль Hysteria 2 auth |
-| `SERVER_IP` | публичный IP VPS |
-| `20000-50000` | port hopping range |
-| `insecure=1` | разрешение self-signed cert |
-| `obfs=salamander` | режим обфускации |
-| `obfs-password` | пароль Salamander |
-| `sni` | SNI Hysteria TLS |
-| `mportHopInt=30` | интервал port hopping для клиентов, которые читают Happ-style параметр |
+Скрипт `fix-hy2-links.sh` берёт фактический порт/диапазон из существующего config.yaml. `fix-hy2-full.sh` сохраняет существующее значение listen и делает резервную копию конфигурации, но всё ещё переписывает другие параметры и перезапускает Hysteria. Эти скрипты не нужны для добавления Edge и не переводят старые установки на одиночный порт.
 
-Дополнительно сохраняется официальный URI:
+## Файлы
 
-```text
-hysteria2://PASSWORD@SERVER_IP:20000-50000/?insecure=1&obfs=salamander&obfs-password=OBFS_PASSWORD&sni=TARGET_HOST&pinSHA256=CERT_FINGERPRINT#UltraXRay-Hysteria2-Official
-```
-
-## Где Хранятся Ссылки
-
-```text
-/root/ultraxray-vless-link.txt
-/root/ultraxray-hy2-link.txt
-/root/ultraxray-hy2-happ-auth-link.txt
-/root/ultraxray-hy2-single-link.txt
-/root/ultraxray-hy2-official-link.txt
-```
-
-QR-коды:
-
-```text
-/root/ultraxray-vless-qr.png
-/root/ultraxray-hy2-qr.png
-```
+Ссылки и соответствующие PNG сохраняются под `/root/ultraxray-*`. Edge: `ultraxray-vless-vision-edge-link.txt` и `ultraxray-vless-vision-edge-qr.png`. Ссылки являются доступами к серверу и не должны попадать в публичный GitHub.

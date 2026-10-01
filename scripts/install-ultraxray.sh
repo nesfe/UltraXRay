@@ -1,18 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [[ "$(id -u)" -ne 0 ]]; then
-  echo "Установщик необходимо запускать от имени root."
-  exit 1
-fi
-
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 CYAN='\033[0;36m'
 BLUE='\033[0;34m'
 NC='\033[0m'
-ULTRAXRAY_VERSION="2026-05-06.4"
+ULTRAXRAY_VERSION="2026.10.01"
+XRAY_VERSION="v26.6.27"
+HYSTERIA_VERSION="v2.12.3"
 
 title() { printf "\n${BLUE}UltraXRay${NC}\n"; }
 step() { printf "\n${CYAN}== %s ==${NC}\n\n" "$1"; }
@@ -76,13 +73,98 @@ check_tls_host() {
   timeout 20 openssl s_client \
     -connect "${host}:443" \
     -servername "$host" \
-    -verify_hostname "$host" \
+    -verify_hostname "$host" -verify_return_error -tls1_3 -alpn h2 \
     </dev/null >"$log_file" 2>&1
 }
 
+check_existing_installation() {
+  local root="${1:-}" path unit
+  for path in /usr/local/etc/xray /etc/hysteria /root/ultraproxy.env /usr/local/bin/xray /usr/local/bin/hysteria; do
+    if [[ -e "${root}${path}" || -L "${root}${path}" ]]; then
+      err "Найдена существующая установка: ${path}. Ничего не изменено."
+      info "Для добавления Edge используйте python3 scripts/add-vision-edge.py; переустановка не нужна."
+      return 1
+    fi
+  done
+  for unit in xray.service hysteria-server.service hysteria.service hysteria-happ.service; do
+    if systemctl cat "$unit" >/dev/null 2>&1; then
+      err "Сервис ${unit} уже существует. Ничего не изменено."
+      return 1
+    fi
+  done
+}
+
+check_ports() {
+  local port sockets published mapping start end protocol
+  local -a mappings
+  if ! command -v ss >/dev/null 2>&1; then
+    err "Для предварительной проверки нужен ss (пакет iproute2)."
+    return 1
+  fi
+  for port in 443 8443; do
+    sockets="$(ss -H -ltn "sport = :${port}")" || return 1
+    if [[ -n "$sockets" ]]; then
+      err "${port}/tcp занят. Установщик не останавливает чужие процессы."
+      return 1
+    fi
+  done
+  sockets="$(ss -H -lun 'sport = :20000')" || return 1
+  if [[ -n "$sockets" ]]; then
+    err "20000/udp занят. Установщик не останавливает чужие процессы."
+    return 1
+  fi
+  # Also detect Docker publication when its userland proxy is disabled.
+  if command -v docker >/dev/null 2>&1; then
+    published="$(docker ps --format '{{.Ports}}')" || {
+      err "Не удалось проверить опубликованные порты Docker. Ничего не изменено."
+      return 1
+    }
+    read -r -a mappings <<< "${published//$'\n'/ }"
+    for mapping in "${mappings[@]}"; do
+      if [[ "$mapping" =~ :([0-9]+)(-([0-9]+))?-\>[^,[:space:]]+/(tcp|udp) ]]; then
+        start="${BASH_REMATCH[1]}"
+        end="${BASH_REMATCH[3]:-$start}"
+        protocol="${BASH_REMATCH[4]}"
+        for port in 443 8443 20000; do
+          if (( port >= 10#$start && port <= 10#$end )) &&
+             { [[ "$protocol" == tcp && "$port" != 20000 ]] || [[ "$protocol" == udp && "$port" == 20000 ]]; }; then
+            err "${port}/${protocol} уже опубликован Docker. Ничего не изменено."
+            return 1
+          fi
+        done
+      fi
+    done
+  fi
+}
+
+configure_firewall() {
+  local status
+  status="$(LC_ALL=C ufw status)" || return 1
+  if [[ "$status" == *"Status: active"* ]]; then
+    ufw allow 443/tcp comment 'UltraXRay XHTTP'
+    ufw allow 8443/tcp comment 'UltraXRay Vision and Edge'
+    ufw allow 20000/udp comment 'UltraXRay Hysteria'
+    ok "Добавлены только три правила UltraXRay; остальные правила и политики сохранены"
+  else
+    warn "UFW неактивен и оставлен неактивным."
+    info "При необходимости откройте 443/tcp, 8443/tcp и 20000/udp в используемом firewall и панели VPS."
+  fi
+}
+
+main() {
+  if [[ "$(id -u)" -ne 0 ]]; then
+    err "Установщик необходимо запускать от имени root."
+    return 1
+  fi
+  check_existing_installation || return 1
+  check_ports || return 1
+  umask 077
+  WORK_DIR="$(mktemp -d)"
+  trap 'rm -rf -- "$WORK_DIR"' EXIT
+
 title
 printf "Установщик двухъядерной конфигурации Xray XHTTP REALITY и Hysteria 2\n"
-printf "Режим установки: полная пересборка proxy-стека на сервере\n"
+printf "Новая установка рядом с существующими сервисами, без очистки сервера\n"
 printf "Версия установщика: %s\n" "$ULTRAXRAY_VERSION"
 
 TARGET_HOST_DEFAULT="www.mix.com"
@@ -98,12 +180,12 @@ ok "REALITY SNI: ${TARGET_HOST}"
 read -r -s -p "Пароль для Hysteria 2 [оставьте пустым для генерации]: " HYSTERIA_PASSWORD
 printf "\n"
 
-warn "Будут удалены старые Xray/Hysteria, очищены iptables и сброшен UFW."
-warn "Xray займёт 443/tcp и 8443/tcp, Hysteria 2 займёт 20000-50000/udp."
+info "Amnezia, Docker, Outline и существующие сетевые правила сохраняются."
+info "Нужны свободные 443/tcp, 8443/tcp и 20000/udp."
 
 step "Установка базовых зависимостей"
-DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a apt-get update -qq
-DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=a apt-get install -y -qq curl openssl ufw ca-certificates qrencode jq unzip iptables
+DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=l apt-get update -qq
+DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=l apt-get install -y -qq curl openssl ufw ca-certificates qrencode jq unzip python3
 ok "Системные зависимости установлены"
 
 if [[ -z "$HYSTERIA_PASSWORD" ]]; then
@@ -111,108 +193,30 @@ if [[ -z "$HYSTERIA_PASSWORD" ]]; then
   ok "Пароль Hysteria сгенерирован"
 fi
 
-step "Полная очистка старого proxy-стека"
-if command -v docker >/dev/null 2>&1; then
-  warn "Обнаружен Docker. Выполняется удаление контейнеров, сетей и пакетов."
-  docker stop $(docker ps -aq) 2>/dev/null || true
-  docker rm $(docker ps -aq) 2>/dev/null || true
-  docker network prune -f 2>/dev/null || true
-  systemctl stop docker.socket docker.service 2>/dev/null || true
-  apt-get purge -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin 2>/dev/null || true
-  apt-get purge -y docker docker.io containerd runc 2>/dev/null || true
-  rm -rf /var/lib/docker /var/lib/containerd /etc/docker
-  ok "Docker удалён"
-else
-  ok "Docker не найден"
-fi
-
-rm -rf /opt/amnezia /etc/amnezia 2>/dev/null || true
-rm -rf /opt/outline /etc/outline 2>/dev/null || true
-ok "Остатки Amnezia и Outline удалены"
-
-systemctl stop xray 2>/dev/null || true
-systemctl disable xray 2>/dev/null || true
-systemctl stop hysteria-server hysteria hysteria-happ 2>/dev/null || true
-systemctl disable hysteria-server hysteria hysteria-happ 2>/dev/null || true
-
-if download_file https://get.hy2.sh/ /tmp/ultraxray-get-hy2.sh >/tmp/ultraxray-hy2-download.log 2>&1; then
-  if bash /tmp/ultraxray-get-hy2.sh --remove >/tmp/ultraxray-hy2-remove.log 2>&1; then
-    ok "Предыдущая установка Hysteria удалена"
-    rm -f /tmp/ultraxray-hy2-remove.log
-  else
-    warn "Официальный remover Hysteria завершился с предупреждением, продолжаю ручную очистку"
-    tail -n 20 /tmp/ultraxray-hy2-remove.log || true
-  fi
-  rm -f /tmp/ultraxray-get-hy2.sh
-  rm -f /tmp/ultraxray-hy2-download.log
-else
-  warn "Не удалось скачать remover Hysteria, продолжаю ручную очистку"
-  sed -n '1,80p' /tmp/ultraxray-hy2-download.log || true
-fi
-
-rm -f /etc/systemd/system/hysteria-server.service \
-  /etc/systemd/system/hysteria-server@.service \
-  /etc/systemd/system/hysteria-happ.service \
-  /etc/systemd/system/multi-user.target.wants/hysteria-server.service \
-  /etc/systemd/system/multi-user.target.wants/hysteria-server@*.service \
-  /etc/systemd/system/multi-user.target.wants/hysteria-happ.service 2>/dev/null || true
-systemctl daemon-reload 2>/dev/null || true
-userdel -r hysteria 2>/dev/null || true
-
-rm -rf /usr/local/etc/xray \
-  /etc/hysteria \
-  /var/lib/hysteria \
-  /root/ultraproxy.env \
-  /root/ultraxray-vless-link.txt \
-  /root/ultraxray-vless-qr.png \
-  /root/ultraxray-vless-vision-link.txt \
-  /root/ultraxray-vless-vision-qr.png \
-  /root/ultraxray-hy2-link.txt \
-  /root/ultraxray-hy2-single-link.txt \
-  /root/ultraxray-hy2-official-link.txt \
-  /root/ultraxray-hy2-happ-link.txt \
-  /root/ultraxray-hy2-qr.png 2>/dev/null || true
-
-fuser -k 443/tcp 2>/dev/null || true
-fuser -k 8443/tcp 2>/dev/null || true
-fuser -k 20000/udp 2>/dev/null || true
-fuser -k 51000/udp 2>/dev/null || true
-
-iptables -F 2>/dev/null || true
-iptables -X 2>/dev/null || true
-iptables -t nat -F 2>/dev/null || true
-iptables -t nat -X 2>/dev/null || true
-iptables -t mangle -F 2>/dev/null || true
-iptables -t mangle -X 2>/dev/null || true
-iptables -P INPUT ACCEPT 2>/dev/null || true
-iptables -P FORWARD ACCEPT 2>/dev/null || true
-iptables -P OUTPUT ACCEPT 2>/dev/null || true
-ok "Старые сервисы, конфиги и firewall-правила очищены"
-
 step "Проверка TLS-хоста для REALITY"
-if echo | openssl s_client -connect "${TARGET_HOST}:443" -servername "${TARGET_HOST}" -verify_hostname "${TARGET_HOST}" >/tmp/ultraxray-target.log 2>&1; then
+if check_tls_host "$TARGET_HOST" "$WORK_DIR/target.log"; then
   ok "Сертификат ${TARGET_HOST} успешно проверен"
 else
   err "Проверка сертификата ${TARGET_HOST} не прошла"
-  sed -n '1,80p' /tmp/ultraxray-target.log || true
+  sed -n '1,80p' "${WORK_DIR}/target.log" || true
   exit 1
 fi
 
 step "Установка Xray-core"
 info "Скачиваю официальный установщик Xray-core"
-download_file https://github.com/XTLS/Xray-install/raw/main/install-release.sh /tmp/ultraxray-xray-install.sh
+download_file https://github.com/XTLS/Xray-install/raw/main/install-release.sh "${WORK_DIR}/xray-install.sh"
 info "Запускаю установщик Xray-core"
-bash /tmp/ultraxray-xray-install.sh install
-rm -f /tmp/ultraxray-xray-install.sh
+bash "${WORK_DIR}/xray-install.sh" install --version "$XRAY_VERSION"
+rm -f "${WORK_DIR}/xray-install.sh"
 test -x /usr/local/bin/xray
 ok "$(/usr/local/bin/xray version | head -1)"
 
 step "Установка Hysteria 2"
 info "Скачиваю официальный установщик Hysteria 2"
-download_file https://get.hy2.sh/ /tmp/ultraxray-get-hy2.sh
+download_file https://get.hy2.sh/ "${WORK_DIR}/hy2-install.sh"
 info "Запускаю установщик Hysteria 2"
-HYSTERIA_USER=root bash /tmp/ultraxray-get-hy2.sh
-rm -f /tmp/ultraxray-get-hy2.sh
+HYSTERIA_USER=hysteria bash "${WORK_DIR}/hy2-install.sh" --version "$HYSTERIA_VERSION"
+rm -f "${WORK_DIR}/hy2-install.sh"
 test -x /usr/local/bin/hysteria
 ok "$(/usr/local/bin/hysteria version | head -1)"
 
@@ -368,6 +372,9 @@ cat > /usr/local/etc/xray/config.json <<EOF
 }
 EOF
 
+chown -R root:nogroup /usr/local/etc/xray
+chmod 750 /usr/local/etc/xray
+chmod 640 /usr/local/etc/xray/config.json
 "/usr/local/bin/xray" run -test -config /usr/local/etc/xray/config.json
 ok "Конфиг Xray валиден"
 
@@ -388,6 +395,7 @@ openssl req -x509 -nodes -newkey ec \
   -days 3650 \
   -subj "/CN=${TARGET_HOST}" \
   -addext "subjectAltName=DNS:${TARGET_HOST}" >/dev/null 2>&1
+chown hysteria:hysteria /etc/hysteria/server.key
 chmod 600 /etc/hysteria/server.key
 
 HYSTERIA_CERT_FINGERPRINT="$(openssl x509 -noout -fingerprint -sha256 -in /etc/hysteria/server.crt | sed 's/^sha256 Fingerprint=//; s/^SHA256 Fingerprint=//')"
@@ -395,7 +403,7 @@ HYSTERIA_PIN_SHA256="$(printf '%s' "$HYSTERIA_CERT_FINGERPRINT" | tr -d ':' | tr
 HYSTERIA_OBFS_PASSWORD="$(openssl rand -base64 24 | tr '+/' '-_' | tr -d '=')"
 
 cat > /etc/hysteria/config.yaml <<EOF
-listen: :20000-50000
+listen: :20000
 
 tls:
   cert: /etc/hysteria/server.crt
@@ -430,19 +438,14 @@ masquerade:
     rewriteHost: true
 EOF
 
+chown -R hysteria:hysteria /etc/hysteria
+chmod 750 /etc/hysteria
+chmod 600 /etc/hysteria/config.yaml
 ok "Конфиг Hysteria 2 записан"
 ok "Hysteria Salamander password: ${HYSTERIA_OBFS_PASSWORD}"
 
-step "Настройка firewall"
-ufw --force reset
-ufw default deny incoming
-ufw default allow outgoing
-ufw allow 22/tcp comment 'SSH'
-ufw allow 443/tcp comment 'Xray VLESS XHTTP REALITY'
-ufw allow 8443/tcp comment 'Xray VLESS Vision REALITY fallback'
-ufw allow 20000:50000/udp comment 'Hysteria 2 UDP port hopping'
-ufw --force enable
-ok "UFW настроен"
+step "Дополнение firewall без сброса"
+configure_firewall
 
 step "Запуск systemd-сервисов"
 systemctl enable xray
@@ -454,33 +457,35 @@ systemctl is-active --quiet xray
 systemctl is-active --quiet hysteria-server.service
 ok "Xray и Hysteria 2 запущены"
 
-if ss -ltnp | grep -q ':443'; then
+if [[ -n "$(ss -H -ltn 'sport = :443')" ]]; then
   ok "443/tcp слушает Xray"
 else
   err "443/tcp не слушает"
   exit 1
 fi
 
-if ss -ltnp | grep -q ':8443'; then
+if [[ -n "$(ss -H -ltn 'sport = :8443')" ]]; then
   ok "8443/tcp слушает Xray Vision fallback"
 else
   err "8443/tcp не слушает"
   exit 1
 fi
 
-if ss -lunp | grep -Eq ':(20000|[2-4][0-9]{4}|50000)'; then
-  ok "UDP port hopping диапазон Hysteria активен"
+if [[ -n "$(ss -H -lun 'sport = :20000')" ]]; then
+  ok "20000/udp слушает Hysteria"
 else
-  warn "Не вижу UDP-сокет диапазона в ss; проверьте journalctl -u hysteria-server.service"
+  err "20000/udp не слушает"
+  exit 1
 fi
 
 step "Сохранение доступов"
 VLESS_LINK="vless://${XRAY_UUID}@${SERVER_IP}:443?encryption=$(urlencode "$VLESS_ENCRYPTION")&type=xhttp&security=reality&sni=$(urlencode "$TARGET_HOST")&fp=chrome&pbk=$(urlencode "$REALITY_PUBLIC_KEY")&sid=${REALITY_SHORT_ID}&path=$(urlencode "$XHTTP_PATH")&mode=packet-up&spx=$(urlencode "$SPIDER_X")#UltraXRay-XHTTP-REALITY"
 VLESS_VISION_LINK="vless://${VISION_UUID}@${SERVER_IP}:${VISION_PORT}?encryption=none&type=tcp&security=reality&sni=$(urlencode "$TARGET_HOST")&fp=chrome&pbk=$(urlencode "$VISION_PUBLIC_KEY")&sid=${VISION_SHORT_ID}&flow=xtls-rprx-vision#UltraXRay-Vision-REALITY"
-HY2_LINK="hy2://$(urlencode "$HYSTERIA_PASSWORD")@${SERVER_IP}:20000-50000/?security=tls&insecure=1&obfs=salamander&obfs-password=$(urlencode "$HYSTERIA_OBFS_PASSWORD")&sni=$(urlencode "$TARGET_HOST")&mportHopInt=30#UltraXRay-Hysteria2-Full"
-HY2_HAPP_AUTH_LINK="hy2://${SERVER_IP}:20000-50000/?auth=$(urlencode "$HYSTERIA_PASSWORD")&security=tls&insecure=1&obfs=salamander&obfs-password=$(urlencode "$HYSTERIA_OBFS_PASSWORD")&sni=$(urlencode "$TARGET_HOST")&mportHopInt=30#UltraXRay-Hysteria2-HappAuth"
+VLESS_VISION_EDGE_LINK="vless://${VISION_UUID}@${SERVER_IP}:${VISION_PORT}?encryption=none&type=tcp&security=reality&sni=$(urlencode "$TARGET_HOST")&fp=edge&pbk=$(urlencode "$VISION_PUBLIC_KEY")&sid=${VISION_SHORT_ID}&flow=xtls-rprx-vision#UltraXRay-Vision-EDGE-REALITY"
+HY2_LINK="hy2://$(urlencode "$HYSTERIA_PASSWORD")@${SERVER_IP}:20000/?security=tls&insecure=1&obfs=salamander&obfs-password=$(urlencode "$HYSTERIA_OBFS_PASSWORD")&sni=$(urlencode "$TARGET_HOST")#UltraXRay-Hysteria2"
+HY2_HAPP_AUTH_LINK="hy2://${SERVER_IP}:20000/?auth=$(urlencode "$HYSTERIA_PASSWORD")&security=tls&insecure=1&obfs=salamander&obfs-password=$(urlencode "$HYSTERIA_OBFS_PASSWORD")&sni=$(urlencode "$TARGET_HOST")#UltraXRay-Hysteria2-HappAuth"
 HY2_SINGLE_LINK="hy2://$(urlencode "$HYSTERIA_PASSWORD")@${SERVER_IP}:20000/?security=tls&insecure=1&obfs=salamander&obfs-password=$(urlencode "$HYSTERIA_OBFS_PASSWORD")&sni=$(urlencode "$TARGET_HOST")#UltraXRay-Hysteria2-SinglePort"
-HY2_OFFICIAL_LINK="hysteria2://$(urlencode "$HYSTERIA_PASSWORD")@${SERVER_IP}:20000-50000/?insecure=1&obfs=salamander&obfs-password=$(urlencode "$HYSTERIA_OBFS_PASSWORD")&sni=$(urlencode "$TARGET_HOST")&pinSHA256=$(urlencode "$HYSTERIA_PIN_SHA256")#UltraXRay-Hysteria2-Official"
+HY2_OFFICIAL_LINK="hysteria2://$(urlencode "$HYSTERIA_PASSWORD")@${SERVER_IP}:20000/?insecure=1&obfs=salamander&obfs-password=$(urlencode "$HYSTERIA_OBFS_PASSWORD")&sni=$(urlencode "$TARGET_HOST")&pinSHA256=$(urlencode "$HYSTERIA_PIN_SHA256")#UltraXRay-Hysteria2-Official"
 
 cat > /root/ultraproxy.env <<EOF
 SERVER_IP=$(env_value "$SERVER_IP")
@@ -504,6 +509,8 @@ HYSTERIA_CERT_FINGERPRINT=$(env_value "$HYSTERIA_CERT_FINGERPRINT")
 HYSTERIA_PIN_SHA256=$(env_value "$HYSTERIA_PIN_SHA256")
 VLESS_LINK=$(env_value "$VLESS_LINK")
 VLESS_VISION_LINK=$(env_value "$VLESS_VISION_LINK")
+VLESS_VISION_EDGE_LINK=$(env_value "$VLESS_VISION_EDGE_LINK")
+HYSTERIA_PORTS=20000
 HY2_LINK=$(env_value "$HY2_LINK")
 HY2_HAPP_AUTH_LINK=$(env_value "$HY2_HAPP_AUTH_LINK")
 HY2_SINGLE_LINK=$(env_value "$HY2_SINGLE_LINK")
@@ -513,12 +520,14 @@ chmod 600 /root/ultraproxy.env
 
 printf '%s\n' "$VLESS_LINK" > /root/ultraxray-vless-link.txt
 printf '%s\n' "$VLESS_VISION_LINK" > /root/ultraxray-vless-vision-link.txt
+printf '%s\n' "$VLESS_VISION_EDGE_LINK" > /root/ultraxray-vless-vision-edge-link.txt
 printf '%s\n' "$HY2_LINK" > /root/ultraxray-hy2-link.txt
 printf '%s\n' "$HY2_HAPP_AUTH_LINK" > /root/ultraxray-hy2-happ-auth-link.txt
 printf '%s\n' "$HY2_SINGLE_LINK" > /root/ultraxray-hy2-single-link.txt
 printf '%s\n' "$HY2_OFFICIAL_LINK" > /root/ultraxray-hy2-official-link.txt
 printf '%s' "$VLESS_LINK" | qrencode -o /root/ultraxray-vless-qr.png
 printf '%s' "$VLESS_VISION_LINK" | qrencode -o /root/ultraxray-vless-vision-qr.png
+printf '%s' "$VLESS_VISION_EDGE_LINK" | qrencode -o /root/ultraxray-vless-vision-edge-qr.png
 printf '%s' "$HY2_LINK" | qrencode -o /root/ultraxray-hy2-qr.png
 printf '%s' "$HY2_HAPP_AUTH_LINK" | qrencode -o /root/ultraxray-hy2-happ-auth-qr.png
 printf '%s' "$HY2_SINGLE_LINK" | qrencode -o /root/ultraxray-hy2-single-qr.png
@@ -539,8 +548,9 @@ step "Результат установки"
 info "Xray: VLESS + REALITY + XHTTP + VLESS Encryption"
 info "Xray port: 443/tcp"
 info "Xray fallback: VLESS + REALITY + Vision на 8443/tcp"
-info "Hysteria 2: Salamander + UDP port hopping"
-info "Hysteria UDP range: 20000-50000/udp"
+info "Xray дополнительный профиль: Vision EDGE на том же 8443/tcp"
+info "Hysteria 2: Salamander, один UDP-порт"
+info "Hysteria UDP port: 20000/udp"
 info "Файл доступов: /root/ultraproxy.env"
 
 printf "\n${GREEN}VLESS XHTTP REALITY ссылка${NC}\n\n"
@@ -553,9 +563,13 @@ cat /root/ultraxray-vless-vision-link.txt
 printf "\n\n${GREEN}VLESS Vision fallback QR-код${NC}\n\n"
 printf '%s' "$VLESS_VISION_LINK" | qrencode -t ANSIUTF8
 
-printf "\n\n${GREEN}Hysteria 2 Full ссылка${NC}\n\n"
+printf "\n\n${GREEN}VLESS Vision EDGE REALITY ссылка${NC}\n\n"
+printf '%s\n' "$VLESS_VISION_EDGE_LINK"
+printf '%s' "$VLESS_VISION_EDGE_LINK" | qrencode -t ANSIUTF8
+
+printf "\n\n${GREEN}Hysteria 2 ссылка${NC}\n\n"
 cat /root/ultraxray-hy2-link.txt
-printf "\n\n${GREEN}Hysteria 2 Full QR-код${NC}\n\n"
+printf "\n\n${GREEN}Hysteria 2 QR-код${NC}\n\n"
 printf '%s' "$HY2_LINK" | qrencode -t ANSIUTF8
 
 printf "\n\n${GREEN}Hysteria 2 Single-port ссылка${NC}\n\n"
@@ -569,3 +583,9 @@ printf "  systemctl status hysteria-server.service\n"
 printf "  journalctl -u xray -n 80 --no-pager\n"
 printf "  journalctl -u hysteria-server.service -n 80 --no-pager\n"
 printf "  cat /root/ultraproxy.env\n"
+
+}
+
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+  main "$@"
+fi

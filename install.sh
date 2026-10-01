@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-RAW_URL="https://raw.githubusercontent.com/nesfe/UltraXRay/main/scripts/install-ultraxray.sh"
+RELEASE="v2026.10.01"
+RAW_URL="https://raw.githubusercontent.com/nesfe/UltraXRay/${RELEASE}/scripts/install-ultraxray.sh"
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 
-if [[ -f "./scripts/install-ultraxray.sh" ]]; then
+if [[ -f "${SCRIPT_DIR}/scripts/install-ultraxray.sh" ]]; then
   printf 'Запуск локального установщика UltraXRay\n'
-  bash "./scripts/install-ultraxray.sh"
+  bash "${SCRIPT_DIR}/scripts/install-ultraxray.sh"
   exit 0
 fi
 

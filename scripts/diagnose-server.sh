@@ -51,5 +51,6 @@ if [[ -f "$ENV_FILE" ]]; then
   printf 'TARGET_HOST=%s\n' "${TARGET_HOST:-}"
   printf 'VLESS_LINK=%s\n' "${VLESS_LINK:-}"
   printf 'VLESS_VISION_LINK=%s\n' "${VLESS_VISION_LINK:-}"
+  printf 'VLESS_VISION_EDGE_LINK=%s\n' "${VLESS_VISION_EDGE_LINK:-}"
   printf 'HY2_LINK=%s\n' "${HY2_LINK:-}"
 fi

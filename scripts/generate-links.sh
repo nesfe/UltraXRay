@@ -2,6 +2,7 @@
 set -euo pipefail
 
 ENV_FILE="${1:-/root/ultraproxy.env}"
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 
 if [[ ! -f "$ENV_FILE" ]]; then
   echo "Файл доступов не найден: $ENV_FILE"
@@ -38,12 +39,22 @@ if [[ -n "${VLESS_VISION_LINK:-}" ]]; then
   fi
 fi
 
+if [[ -n "${VLESS_VISION_LINK:-}" ]]; then
+  VLESS_VISION_EDGE_LINK="$(printf '%s' "$VLESS_VISION_LINK" | python3 "$SCRIPT_DIR/add-vision-edge.py" - --print-only)"
+  echo
+  echo "VLESS Vision EDGE REALITY ссылка:"
+  printf '%s\n' "$VLESS_VISION_EDGE_LINK"
+  if command -v qrencode >/dev/null 2>&1; then
+    printf '%s' "$VLESS_VISION_EDGE_LINK" | qrencode -t ANSIUTF8
+  fi
+fi
+
 echo
-echo "Hysteria 2 Full ссылка:"
+echo "Hysteria 2 ссылка:"
 echo
 printf '%s\n' "$HY2_LINK"
 echo
-echo "Hysteria 2 Full QR-код:"
+echo "Hysteria 2 QR-код:"
 echo
 if command -v qrencode >/dev/null 2>&1; then
   printf '%s' "$HY2_LINK" | qrencode -t ANSIUTF8

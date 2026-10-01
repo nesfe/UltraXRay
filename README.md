@@ -1,227 +1,133 @@
 # UltraXRay
 
-![Xray XHTTP REALITY](https://img.shields.io/badge/Xray-XHTTP%20REALITY-0f172a?style=for-the-badge)
-![VLESS Encryption](https://img.shields.io/badge/VLESS-ML--KEM--768-1d4ed8?style=for-the-badge)
-![Hysteria 2](https://img.shields.io/badge/Hysteria%202-Port%20Hopping-7c3aed?style=for-the-badge)
-![Ubuntu](https://img.shields.io/badge/Ubuntu-22.04%2B-e95420?style=for-the-badge)
-![One Command Install](https://img.shields.io/badge/Install-One%20Command-166534?style=for-the-badge)
+Версия **2026.10.01**: XHTTP + REALITY, Vision + REALITY, дополнительный **Vision EDGE** и Hysteria 2. Установка рядом с Amnezia/Docker без очистки сервера.
 
-`UltraXRay` разворачивает два независимых proxy-ядра на одном VPS:
+## Профили
 
-- `Xray-core`: `VLESS + REALITY + XHTTP` на `443/tcp` с VLESS Encryption, сгенерированной через `xray vlessenc`;
-- `Hysteria 2`: UDP-транспорт с `Salamander` obfuscation и port hopping в диапазоне `20000-50000/udp`.
+| Профиль | Порт | Назначение |
+| --- | --- | --- |
+| VLESS XHTTP REALITY | 443/tcp | XHTTP packet-up с VLESS Encryption |
+| VLESS Vision REALITY | 8443/tcp | Vision с TLS fingerprint `chrome` |
+| **VLESS Vision EDGE REALITY** | тот же 8443/tcp | Альтернативный клиентский fingerprint `edge` |
+| Hysteria 2 + Salamander | 20000/udp | Независимый UDP-профиль, один порт |
 
-## Содержание
+Vision EDGE использует те же UUID, ключ REALITY, shortId, SNI и порт, что обычный Vision. Новый серверный inbound не нужен. В проверенной связке начальное TLS-приветствие Edge было 517 байт, Chrome — около 1800 байт. Edge помог на соединении, где Chrome зависал на начальном обмене. Это результат конкретной проверки, а не гарантия обхода фильтрации у любого провайдера: точная причина потери пакетов не установлена.
 
-- [Зачем два ядра](#зачем-два-ядра)
-- [Сетевая схема](#сетевая-схема)
-- [Установка одной командой](#установка-одной-командой)
-- [Что делает установщик](#что-делает-установщик)
-- [Что создаётся на сервере](#что-создаётся-на-сервере)
-- [Параметры профилей](#параметры-профилей)
-- [Повторный вывод ссылок](#повторный-вывод-ссылок)
-- [Диагностика](#диагностика)
-- [Документация](#документация)
+## Добавить Edge в существующую установку
 
-## Зачем два ядра
-
-`Xray` и `Hysteria 2` решают разные задачи и работают параллельно.
-
-`Xray-core` используется как основной TCP-профиль:
-
-- публичный порт `443/tcp`;
-- `REALITY` вместо обычного TLS-сертификата на сервере;
-- `XHTTP` вместо старого `raw tcp`/`ws`;
-- отдельный случайный `path`;
-- VLESS Encryption с ML-KEM-768-профилем, сгенерированным штатной командой `xray vlessenc`.
-- совместимый fallback `VLESS + REALITY + Vision` на `8443/tcp` для клиентов без стабильной поддержки XHTTP/VLESS Encryption.
-
-`Hysteria 2` используется как отдельный UDP-профиль:
-
-- port hopping `20000-50000/udp`;
-- `Salamander` obfuscation с отдельным случайным паролем;
-- самоподписанный сертификат;
-- Happ-compatible `hy2://` QR с альтернативным `auth=` query-параметром;
-- `pinSHA256` в official URI для клиентов, которые корректно импортируют pin.
-
-## Сетевая схема
-
-После установки сервер слушает:
-
-| Порт | Протокол | Сервис | Назначение |
-| --- | --- | --- | --- |
-| `22/tcp` | SSH | OpenSSH | администрирование |
-| `443/tcp` | TCP | Xray-core | `VLESS + REALITY + XHTTP` |
-| `8443/tcp` | TCP | Xray-core | `VLESS + REALITY + Vision` fallback |
-| `20000-50000/udp` | UDP | Hysteria 2 | port hopping |
-
-Firewall настраивается через `ufw`. Входящие соединения по умолчанию запрещаются, открываются только перечисленные порты.
-
-## Установка одной командой
+**Повторная установка не нужна.** В клоне репозитория выполните от root:
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/nesfe/UltraXRay/main/install.sh)
+git pull --ff-only
+python3 scripts/add-vision-edge.py
 ```
 
-Установщик спросит:
+Нужен Python 3. Скрипт читает `/root/ultraxray-vless-vision-link.txt`, печатает новую ссылку и создаёт:
 
-- домен или URL для маскировки `REALITY SNI`, по умолчанию `www.mix.com`;
-- пароль для `Hysteria 2`; если оставить пустым, пароль будет сгенерирован автоматически.
+- `/root/ultraxray-vless-vision-edge-link.txt`;
+- `/root/ultraxray-vless-vision-edge-qr.png`, если установлен `qrencode`.
 
-Можно вводить как `lemanapro.ru`, так и `https://lemanapro.ru/`. Установщик сам приведёт ввод к чистому hostname для `openssl`, REALITY SNI и клиентских ссылок.
+Конфиги, ключи, исходная ссылка, службы и firewall не меняются. Файлы профиля имеют права `600`. Импортируйте новую ссылку отдельным профилем в клиент.
 
-## Что делает установщик
+Для другого пути:
 
-Сценарий установки:
-
-1. проверяет запуск от `root`;
-2. устанавливает базовые зависимости: `curl`, `openssl`, `ufw`, `qrencode`, `jq`, `unzip`, `iptables`;
-3. удаляет Docker, если он найден, вместе с контейнерами, сетями и данными;
-4. удаляет остатки Amnezia и Outline;
-5. останавливает старые сервисы `xray`, `hysteria-server`, `hysteria`;
-6. удаляет старые конфиги и артефакты `UltraXRay`;
-7. освобождает `443/tcp` и `20000/udp`;
-8. очищает `iptables` и сбрасывает политики в `ACCEPT` перед новой настройкой;
-9. проверяет TLS-хост, выбранный для `REALITY`, не меняет введённый SNI и останавливает установку с логом OpenSSL, если хост не подходит;
-10. устанавливает актуальный `Xray-core`;
-11. устанавливает актуальный `Hysteria 2` через официальный установщик;
-12. генерирует `UUID`, `x25519` REALITY keys, `shortId`, `XHTTP path`, `spiderX`;
-13. генерирует пару `decryption/encryption` для VLESS Encryption через `xray vlessenc`;
-14. записывает `/usr/local/etc/xray/config.json`;
-15. проверяет Xray-конфиг через `xray run -test`;
-16. генерирует самоподписанный сертификат Hysteria 2;
-17. генерирует параметры Hysteria 2 и fingerprint сертификата;
-18. записывает `/etc/hysteria/config.yaml`;
-19. настраивает `ufw`;
-20. включает и запускает `xray` и `hysteria-server.service`;
-21. формирует `vless://` и `hy2://` ссылки;
-22. печатает обе ссылки и оба QR-кода в терминал;
-23. сохраняет все параметры в `/root/ultraproxy.env`.
-
-## Что создаётся на сервере
-
-Основные конфиги:
-
-- `/usr/local/etc/xray/config.json`
-- `/etc/hysteria/config.yaml`
-- `/etc/hysteria/server.crt`
-- `/etc/hysteria/server.key`
-
-Файлы доступа:
-
-- `/root/ultraproxy.env`
-- `/root/ultraxray-vless-link.txt`
-- `/root/ultraxray-vless-qr.png`
-- `/root/ultraxray-hy2-link.txt`
-- `/root/ultraxray-hy2-qr.png`
-
-Файл `/root/ultraproxy.env` создаётся с правами `600`.
-
-## Параметры профилей
-
-### VLESS XHTTP REALITY
-
-Типовая ссылка выглядит так:
-
-```text
-vless://UUID@SERVER_IP:443?encryption=VLESS_ENCRYPTION&type=xhttp&security=reality&sni=TARGET_HOST&fp=chrome&pbk=PUBLIC_KEY&sid=SHORT_ID&path=XHTTP_PATH&mode=packet-up&spx=SPIDER_X#UltraXRay-XHTTP-REALITY
+```bash
+python3 scripts/add-vision-edge.py /path/to/vision-link.txt --output-dir /path/to/output
 ```
 
-Ключевые параметры:
+Чтобы только вывести ссылку без создания файлов:
 
-- `type=xhttp` — новый HTTP-based transport Xray;
-- `mode=packet-up` — наиболее совместимый XHTTP-режим;
-- `security=reality` — REALITY handshake;
-- `sni` — домен, выбранный как маскировочный TLS-хост;
-- `pbk` — публичный ключ REALITY;
-- `sid` — `shortId`;
-- `encryption` — клиентская часть VLESS Encryption, сгенерированная `xray vlessenc`;
-- `path` — случайный HTTP path;
-- `spx` — Reality spiderX path.
-
-### VLESS Vision REALITY
-
-Совместимый fallback-профиль сохраняется отдельно:
-
-```text
-vless://UUID@SERVER_IP:8443?encryption=none&type=tcp&security=reality&sni=TARGET_HOST&fp=chrome&pbk=PUBLIC_KEY&sid=SHORT_ID&flow=xtls-rprx-vision#UltraXRay-Vision-REALITY
+```bash
+python3 scripts/add-vision-edge.py /path/to/vision-link.txt --print-only
 ```
 
-Он использует отдельные `UUID`, REALITY keypair и `shortId`, чтобы не смешивать основной XHTTP-профиль с fallback.
+Если сохранённой Vision-ссылки нет, эта утилита остановится. Она не создаёт серверный Vision-inbound. Старый `scripts/add-vision-fallback.sh` создаёт такой inbound, меняет конфигурацию и перезапускает Xray; это отдельная операция, для уже работающего Vision она не нужна.
 
-### Hysteria 2
+## Новая установка
 
-Типовая ссылка выглядит так:
+Ubuntu 22.04+ / Debian с systemd. Нужны root, `ss` (iproute2), свободные `443/tcp`, `8443/tcp`, `20000/udp` и отсутствие существующей установки Xray/Hysteria.
 
-```text
-hy2://PASSWORD@SERVER_IP:20000-50000/?security=tls&insecure=1&obfs=salamander&obfs-password=OBFS_PASSWORD&sni=TARGET_HOST&mportHopInt=30#UltraXRay-Hysteria2-Full
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/nesfe/UltraXRay/v2026.10.01/install.sh)
 ```
 
-Ключевые параметры:
+Установщик спросит домен маскировки REALITY (принимает и URL) и пароль Hysteria; пустой пароль генерируется автоматически.
 
-- `20000-50000` — multi-port/port hopping диапазон;
-- `obfs=salamander` — включение Salamander obfuscation;
-- `obfs-password` — отдельный пароль обфускации;
-- `insecure=1` — требуется из-за self-signed сертификата;
-- `mportHopInt=30` — интервал port hopping для клиентов, которые поддерживают этот параметр;
-- `sni` — тот же домен, что указан пользователем при установке.
+### Сохранение Amnezia и других сервисов
 
-Установщик сохраняет несколько URI для одного и того же полноценного Hysteria 2 сервера:
+Режима очистки больше нет:
 
-- `/root/ultraxray-hy2-link.txt` — `hy2://` с `20000-50000`, Salamander и `mportHopInt=30`;
-- `/root/ultraxray-hy2-happ-auth-link.txt` — Happ-style `hy2://` с `auth=` в query;
-- `/root/ultraxray-hy2-single-link.txt` — тот же Hysteria 2 + Salamander, но на одном порту `20000` для клиентов, которые режут multi-port URI;
-- `/root/ultraxray-hy2-official-link.txt` — официальный `hysteria2://` URI с `pinSHA256`.
+- Docker, контейнеры, сети, Amnezia и Outline не удаляются и не останавливаются;
+- `iptables`/`nftables` не очищаются; чужие процессы на портах не завершаются;
+- занятые порты, в том числе опубликованные Docker, приводят к остановке до установки пакетов;
+- существующие конфиги, бинарники или systemd-службы Xray/Hysteria приводят к остановке; доступы не перегенерируются;
+- если UFW активен, добавляются только правила `443/tcp`, `8443/tcp`, `20000/udp`; остальные правила и политики сохраняются;
+- если UFW выключен, он остаётся выключенным. При необходимости откройте три порта в используемом firewall и панели VPS самостоятельно;
+- Hysteria в новой установке работает от пользователя `hysteria` на одном порту, без правил port hopping;
+- для `needrestart` выбран режим уведомления, а не автоматического перезапуска остальных служб.
 
-## Повторный вывод ссылок
+Это установщик новой конфигурации, а не механизм обновления или восстановления существующей. Если новая установка прервётся после записи файлов, повторный запуск остановится на проверке наличия установки; сначала нужно разобрать причину, а не удалять существующие данные автоматически.
 
-В локальном клоне:
+### Версии компонентов
+
+Новые установки используют **Xray 26.6.27** и **Hysteria 2.12.3**, а не произвольный `latest`. Для Edge важна совместимость серверной и клиентской REALITY-реализации: изменения Xray начиная с 26.9.8 требуют отдельной проверки. Закрепление версий обеспечивает воспроизводимость этого релиза и не заменяет дальнейшие обновления с проверкой совместимости.
+
+В Hysteria 2.12.3 исправлено ошибочное перенаправление исходящего UDP при port hopping. В этой версии UltraXRay port hopping для новых установок вообще не включается.
+
+**Публикация релиза не меняет уже работающий сервер.** В старых установках могут сохраняться диапазон UDP 20000–50000 и старая Hysteria. Их миграция — отдельная операция; утилита добавления Edge их не затрагивает.
+
+## Что сохраняется
+
+Конфигурация:
+
+- `/usr/local/etc/xray/config.json`;
+- `/etc/hysteria/config.yaml`, `server.crt`, `server.key`.
+
+Доступы:
+
+- `/root/ultraproxy.env`;
+- `/root/ultraxray-vless-link.txt`;
+- `/root/ultraxray-vless-vision-link.txt`;
+- `/root/ultraxray-vless-vision-edge-link.txt`;
+- `/root/ultraxray-hy2-link.txt`;
+- `/root/ultraxray-hy2-happ-auth-link.txt`;
+- `/root/ultraxray-hy2-single-link.txt`;
+- `/root/ultraxray-hy2-official-link.txt`.
+
+Для основных ссылок создаются PNG QR-коды. Ссылки содержат доступы: не публикуйте их и `ultraproxy.env` в репозитории.
+
+Повторный вывод ссылок, включая Edge из старого env-файла:
 
 ```bash
 bash scripts/generate-links.sh /root/ultraproxy.env
 ```
 
-На сервере после установки:
+Hysteria использует самоподписанный сертификат. Official URI содержит `pinSHA256`; клиент должен поддерживать и проверять этот pin. Остальные варианты ссылок предназначены для разных импортёров и могут содержать `insecure=1` без pin. Совместимость импорта нужно проверять в конкретном приложении.
+
+## Диагностика и проверки разработки
 
 ```bash
-cat /root/ultraproxy.env
-cat /root/ultraxray-vless-link.txt
-cat /root/ultraxray-hy2-link.txt
-qrencode -t ANSIUTF8 < /root/ultraxray-vless-link.txt
-qrencode -t ANSIUTF8 < /root/ultraxray-hy2-link.txt
-```
-
-## Диагностика
-
-Базовые команды:
-
-```bash
-systemctl status xray
-systemctl status hysteria-server.service
-journalctl -u xray -n 80 --no-pager
-journalctl -u hysteria-server.service -n 80 --no-pager
-ss -ltnp
-ss -lunp
-ufw status verbose
-```
-
-Диагностический скрипт:
-
-```bash
+systemctl status xray hysteria-server.service
+journalctl -u xray -u hysteria-server.service -n 80 --no-pager
+ss -lntup
 bash scripts/diagnose-server.sh /root/ultraproxy.env
 ```
 
-## Ограничения
+Диагностический скрипт выводит ссылки доступа: перед публикацией его вывода удалите секреты.
 
-- Не все клиенты одинаково быстро поддерживают `VLESS Encryption` и `XHTTP`. Если импорт ссылки не сработал, проверьте, что клиент использует свежий Xray-core.
-- Hysteria 2 с self-signed сертификатом требует `insecure=1`; для снижения риска MITM в ссылку добавляется `pinSHA256`.
-- Port hopping Hysteria 2 работает на Linux и требует прав на настройку firewall/redirect rules, поэтому сервис устанавливается от `root`.
-- `REALITY` требует корректный внешний TLS-хост, поддерживающий современные TLS-параметры.
+```bash
+python3 -m unittest discover -s tests -v
+bash -n install.sh
+for script in scripts/*.sh; do bash -n "$script"; done
+```
+
+Тесты проверяют сохранение параметров профиля, повторный запуск генератора, совместимость старых env-файлов, отказ при занятых портах и существующей установке, а также отсутствие сброса/включения UFW. Они не запускают установку пакетов на настоящем сервере.
 
 ## Документация
 
-- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — архитектура двух ядер и причины выбора протоколов;
-- [docs/INSTALLER_FLOW.md](docs/INSTALLER_FLOW.md) — подробный разбор шагов установщика;
-- [docs/CLIENT_PROFILES.md](docs/CLIENT_PROFILES.md) — параметры клиентских ссылок;
-- [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) — диагностика и типовые проблемы;
-- [docs/SOURCES.md](docs/SOURCES.md) — первичные источники синтаксиса.
+- [Изменения](CHANGELOG.md)
+- [Архитектура](docs/ARCHITECTURE.md)
+- [Установщик](docs/INSTALLER_FLOW.md)
+- [Клиентские профили](docs/CLIENT_PROFILES.md)
+- [Диагностика](docs/TROUBLESHOOTING.md)
+- [Источники](docs/SOURCES.md)

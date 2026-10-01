@@ -6,6 +6,7 @@ if [[ "$(id -u)" -ne 0 ]]; then
   exit 1
 fi
 
+umask 077
 ENV_FILE="${1:-/root/ultraproxy.env}"
 XRAY_CONFIG="/usr/local/etc/xray/config.json"
 VISION_PORT="${VISION_PORT:-8443}"
@@ -109,9 +110,10 @@ sleep 2
 systemctl is-active --quiet xray
 
 VLESS_VISION_LINK="vless://${VISION_UUID}@${SERVER_IP}:${VISION_PORT}?encryption=none&type=tcp&security=reality&sni=$(urlencode "$TARGET_HOST")&fp=chrome&pbk=$(urlencode "$VISION_PUBLIC_KEY")&sid=${VISION_SHORT_ID}&flow=xtls-rprx-vision#UltraXRay-Vision-REALITY"
+VLESS_VISION_EDGE_LINK="vless://${VISION_UUID}@${SERVER_IP}:${VISION_PORT}?encryption=none&type=tcp&security=reality&sni=$(urlencode "$TARGET_HOST")&fp=edge&pbk=$(urlencode "$VISION_PUBLIC_KEY")&sid=${VISION_SHORT_ID}&flow=xtls-rprx-vision#UltraXRay-Vision-EDGE-REALITY"
 
 tmp_env="$(mktemp)"
-awk '!/^(VISION_PORT|VISION_UUID|VISION_PRIVATE_KEY|VISION_PUBLIC_KEY|VISION_SHORT_ID|VLESS_VISION_LINK)=/' "$ENV_FILE" > "$tmp_env"
+awk '!/^(VISION_PORT|VISION_UUID|VISION_PRIVATE_KEY|VISION_PUBLIC_KEY|VISION_SHORT_ID|VLESS_VISION_LINK|VLESS_VISION_EDGE_LINK)=/' "$ENV_FILE" > "$tmp_env"
 {
   printf 'VISION_PORT=%s\n' "$(env_value "$VISION_PORT")"
   printf 'VISION_UUID=%s\n' "$(env_value "$VISION_UUID")"
@@ -119,14 +121,17 @@ awk '!/^(VISION_PORT|VISION_UUID|VISION_PRIVATE_KEY|VISION_PUBLIC_KEY|VISION_SHO
   printf 'VISION_PUBLIC_KEY=%s\n' "$(env_value "$VISION_PUBLIC_KEY")"
   printf 'VISION_SHORT_ID=%s\n' "$(env_value "$VISION_SHORT_ID")"
   printf 'VLESS_VISION_LINK=%s\n' "$(env_value "$VLESS_VISION_LINK")"
+  printf 'VLESS_VISION_EDGE_LINK=%s\n' "$(env_value "$VLESS_VISION_EDGE_LINK")"
 } >> "$tmp_env"
 cat "$tmp_env" > "$ENV_FILE"
 rm -f "$tmp_env"
 chmod 600 "$ENV_FILE"
 
 printf '%s\n' "$VLESS_VISION_LINK" > /root/ultraxray-vless-vision-link.txt
+printf '%s\n' "$VLESS_VISION_EDGE_LINK" > /root/ultraxray-vless-vision-edge-link.txt
 if command -v qrencode >/dev/null 2>&1; then
   printf '%s' "$VLESS_VISION_LINK" | qrencode -o /root/ultraxray-vless-vision-qr.png
+  printf '%s' "$VLESS_VISION_EDGE_LINK" | qrencode -o /root/ultraxray-vless-vision-edge-qr.png
 fi
 
 echo "VLESS Vision fallback добавлен на ${VISION_PORT}/tcp"
@@ -136,3 +141,5 @@ echo
 if command -v qrencode >/dev/null 2>&1; then
   printf '%s' "$VLESS_VISION_LINK" | qrencode -t ANSIUTF8
 fi
+
+printf '\nVLESS Vision EDGE REALITY:\n%s\n' "$VLESS_VISION_EDGE_LINK"

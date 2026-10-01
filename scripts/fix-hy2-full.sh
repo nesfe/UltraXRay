@@ -6,6 +6,7 @@ if [[ "$(id -u)" -ne 0 ]]; then
   exit 1
 fi
 
+umask 077
 ENV_FILE="${1:-/root/ultraproxy.env}"
 
 if [[ ! -f "$ENV_FILE" ]]; then
@@ -39,8 +40,15 @@ if [[ ! -f /etc/hysteria/server.crt || ! -f /etc/hysteria/server.key ]]; then
   exit 1
 fi
 
+# Keep the current listener: never add a broad UDP redirect during a repair.
+HYSTERIA_LISTEN="$(awk '$1 == "listen:" {print $2; exit}' /etc/hysteria/config.yaml)"
+if [[ ! "$HYSTERIA_LISTEN" =~ ^:[0-9]+(-[0-9]+)?$ ]]; then
+  echo "Не удалось прочитать listen; конфигурация не изменена."
+  exit 1
+fi
+cp -p /etc/hysteria/config.yaml "/etc/hysteria/config.yaml.bak.$(date +%Y%m%d%H%M%S)"
 cat > /etc/hysteria/config.yaml <<EOF
-listen: :20000-50000
+listen: ${HYSTERIA_LISTEN}
 
 tls:
   cert: /etc/hysteria/server.crt
