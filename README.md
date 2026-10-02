@@ -6,14 +6,13 @@
 
 <p align="center">
   Xray REALITY и Hysteria 2 на одном VPS.<br>
-  Несколько профилей подключения и установка, которая сохраняет соседние сервисы.
+  Четыре профиля подключения — от XHTTP до Vision EDGE.
 </p>
 
 <p align="center">
   <a href="https://github.com/nesfe/UltraXRay/actions/workflows/check.yml"><img src="https://github.com/nesfe/UltraXRay/actions/workflows/check.yml/badge.svg" alt="Статус проверок"></a>
   <a href="https://github.com/nesfe/UltraXRay/releases/tag/v2026.10.01"><img src="https://img.shields.io/badge/релиз-2026.10.01-6366f1?style=flat-square" alt="Релиз 2026.10.01"></a>
   <img src="https://img.shields.io/badge/Ubuntu-22.04%2B-e95420?style=flat-square" alt="Ubuntu 22.04 и новее">
-  <img src="https://img.shields.io/badge/Amnezia-сохраняется-14b8a6?style=flat-square" alt="Сохраняет Amnezia">
 </p>
 
 <p align="center">

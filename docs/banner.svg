@@ -15,7 +15,7 @@
   <text x="78" y="74" fill="#a5f3fc" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="700" letter-spacing="2">SELF-HOSTED  /  TWO CORES</text>
   <text x="60" y="169" fill="#f8fafc" font-family="Arial, Helvetica, sans-serif" font-size="76" font-weight="800" letter-spacing="-4">Ultra<tspan fill="url(#accent)">XRay</tspan></text>
   <text x="64" y="215" fill="#cbd5e1" font-family="Arial, Helvetica, sans-serif" font-size="22">XHTTP · Vision EDGE · Hysteria 2</text>
-  <text x="64" y="256" fill="#94a3b8" font-family="Arial, Helvetica, sans-serif" font-size="16">Один VPS. Несколько профилей. Существующие сервисы сохранены.</text>
+  <text x="64" y="256" fill="#94a3b8" font-family="Arial, Helvetica, sans-serif" font-size="16">Несколько профилей. Один VPS.</text>
   <path d="M 740 160 H 807 M 807 160 L 865 86 H 1005 M 807 160 H 1005 M 807 160 L 865 234 H 1005" fill="none" stroke="url(#accent)" stroke-width="2.5" stroke-linecap="round" stroke-opacity="0.75"/>
   <circle cx="807" cy="160" r="12" fill="#0f172a" stroke="#67e8f9" stroke-width="3"/>
   <circle cx="1005" cy="86" r="7" fill="#67e8f9"/><circle cx="1005" cy="160" r="7" fill="#818cf8"/><circle cx="1005" cy="234" r="7" fill="#a78bfa"/>
