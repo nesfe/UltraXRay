@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="320" viewBox="0 0 1200 320" role="img" aria-labelledby="title desc">
+  <title id="title">UltraXRay</title>
+  <desc id="desc">Xray REALITY, Vision EDGE и Hysteria 2 на одном VPS</desc>
+  <defs>
+    <linearGradient id="background" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0b1220"/><stop offset="0.54" stop-color="#101c35"/><stop offset="1" stop-color="#172554"/></linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#67e8f9"/><stop offset="1" stop-color="#818cf8"/></linearGradient>
+    <pattern id="grid" width="32" height="32" patternUnits="userSpaceOnUse"><path d="M 32 0 L 0 0 0 32" fill="none" stroke="#94a3b8" stroke-opacity="0.08"/></pattern>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="17"/></filter>
+  </defs>
+  <rect width="1200" height="320" rx="22" fill="url(#background)"/>
+  <rect width="1200" height="320" rx="22" fill="url(#grid)"/>
+  <circle cx="1000" cy="152" r="124" fill="#4f46e5" opacity="0.18" filter="url(#glow)"/>
+  <circle cx="827" cy="188" r="102" fill="#06b6d4" opacity="0.15" filter="url(#glow)"/>
+  <rect x="62" y="54" width="262" height="30" rx="15" fill="#164e63" fill-opacity="0.48" stroke="#67e8f9" stroke-opacity="0.42"/>
+  <text x="78" y="74" fill="#a5f3fc" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="700" letter-spacing="2">SELF-HOSTED  /  TWO CORES</text>
+  <text x="60" y="169" fill="#f8fafc" font-family="Arial, Helvetica, sans-serif" font-size="76" font-weight="800" letter-spacing="-4">Ultra<tspan fill="url(#accent)">XRay</tspan></text>
+  <text x="64" y="215" fill="#cbd5e1" font-family="Arial, Helvetica, sans-serif" font-size="22">XHTTP · Vision EDGE · Hysteria 2</text>
+  <text x="64" y="256" fill="#94a3b8" font-family="Arial, Helvetica, sans-serif" font-size="16">Один VPS. Несколько профилей. Существующие сервисы сохранены.</text>
+  <path d="M 740 160 H 807 M 807 160 L 865 86 H 1005 M 807 160 H 1005 M 807 160 L 865 234 H 1005" fill="none" stroke="url(#accent)" stroke-width="2.5" stroke-linecap="round" stroke-opacity="0.75"/>
+  <circle cx="807" cy="160" r="12" fill="#0f172a" stroke="#67e8f9" stroke-width="3"/>
+  <circle cx="1005" cy="86" r="7" fill="#67e8f9"/><circle cx="1005" cy="160" r="7" fill="#818cf8"/><circle cx="1005" cy="234" r="7" fill="#a78bfa"/>
+  <text x="1026" y="91" fill="#e2e8f0" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="700">XHTTP</text>
+  <text x="1026" y="165" fill="#e2e8f0" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="700">VISION EDGE</text>
+  <text x="1026" y="239" fill="#e2e8f0" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="700">HYSTERIA 2</text>
+</svg>

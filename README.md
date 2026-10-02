@@ -1,133 +1,138 @@
-# UltraXRay
+<p align="center">
+  <img src="docs/banner.svg" width="100%" alt="UltraXRay: XHTTP, Vision EDGE и Hysteria 2 на одном VPS">
+</p>
 
-Версия **2026.10.01**: XHTTP + REALITY, Vision + REALITY, дополнительный **Vision EDGE** и Hysteria 2. Установка рядом с Amnezia/Docker без очистки сервера.
+<h1 align="center">UltraXRay</h1>
 
-## Профили
+<p align="center">
+  Xray REALITY и Hysteria 2 на одном VPS.<br>
+  Несколько профилей подключения и установка, которая сохраняет соседние сервисы.
+</p>
 
-| Профиль | Порт | Назначение |
-| --- | --- | --- |
-| VLESS XHTTP REALITY | 443/tcp | XHTTP packet-up с VLESS Encryption |
-| VLESS Vision REALITY | 8443/tcp | Vision с TLS fingerprint `chrome` |
-| **VLESS Vision EDGE REALITY** | тот же 8443/tcp | Альтернативный клиентский fingerprint `edge` |
-| Hysteria 2 + Salamander | 20000/udp | Независимый UDP-профиль, один порт |
+<p align="center">
+  <a href="https://github.com/nesfe/UltraXRay/actions/workflows/check.yml"><img src="https://github.com/nesfe/UltraXRay/actions/workflows/check.yml/badge.svg" alt="Статус проверок"></a>
+  <a href="https://github.com/nesfe/UltraXRay/releases/tag/v2026.10.01"><img src="https://img.shields.io/badge/релиз-2026.10.01-6366f1?style=flat-square" alt="Релиз 2026.10.01"></a>
+  <img src="https://img.shields.io/badge/Ubuntu-22.04%2B-e95420?style=flat-square" alt="Ubuntu 22.04 и новее">
+  <img src="https://img.shields.io/badge/Amnezia-сохраняется-14b8a6?style=flat-square" alt="Сохраняет Amnezia">
+</p>
 
-Vision EDGE использует те же UUID, ключ REALITY, shortId, SNI и порт, что обычный Vision. Новый серверный inbound не нужен. В проверенной связке начальное TLS-приветствие Edge было 517 байт, Chrome — около 1800 байт. Edge помог на соединении, где Chrome зависал на начальном обмене. Это результат конкретной проверки, а не гарантия обхода фильтрации у любого провайдера: точная причина потери пакетов не установлена.
+<p align="center">
+  <a href="#-быстрый-старт">Быстрый старт</a> ·
+  <a href="#-профили">Профили</a> ·
+  <a href="#-как-устроено">Схема</a> ·
+  <a href="CHANGELOG.md">История изменений</a> ·
+  <a href="docs/TROUBLESHOOTING.md">Помощь с подключением</a>
+</p>
 
-## Добавить Edge в существующую установку
+> [!IMPORTANT]
+> **Уже установлен UltraXRay?** Для добавления Vision EDGE используйте генератор профиля ниже. Установщик предназначен для нового сервера и остановится, если обнаружит Xray или Hysteria.
 
-**Повторная установка не нужна.** В клоне репозитория выполните от root:
+## 🚀 Быстрый старт
+
+| Есть работающий Vision | Нужна новая установка |
+| --- | --- |
+| Добавьте Edge-профиль с теми же доступами. Серверный конфиг и службы не меняются. | Подготовьте Ubuntu 22.04+ или Debian с systemd и свободными портами `443/tcp`, `8443/tcp`, `20000/udp`. |
+
+**Добавить Vision EDGE в существующем клоне:**
 
 ```bash
 git pull --ff-only
 python3 scripts/add-vision-edge.py
 ```
 
-Нужен Python 3. Скрипт читает `/root/ultraxray-vless-vision-link.txt`, печатает новую ссылку и создаёт:
+Команда берёт `/root/ultraxray-vless-vision-link.txt`, выводит новую ссылку и сохраняет её в `/root/ultraxray-vless-vision-edge-link.txt`. Если установлен `qrencode`, рядом появится PNG с QR-кодом. Запускайте с доступом к исходному файлу, обычно от `root`.
 
-- `/root/ultraxray-vless-vision-edge-link.txt`;
-- `/root/ultraxray-vless-vision-edge-qr.png`, если установлен `qrencode`.
-
-Конфиги, ключи, исходная ссылка, службы и firewall не меняются. Файлы профиля имеют права `600`. Импортируйте новую ссылку отдельным профилем в клиент.
-
-Для другого пути:
-
-```bash
-python3 scripts/add-vision-edge.py /path/to/vision-link.txt --output-dir /path/to/output
-```
-
-Чтобы только вывести ссылку без создания файлов:
-
-```bash
-python3 scripts/add-vision-edge.py /path/to/vision-link.txt --print-only
-```
-
-Если сохранённой Vision-ссылки нет, эта утилита остановится. Она не создаёт серверный Vision-inbound. Старый `scripts/add-vision-fallback.sh` создаёт такой inbound, меняет конфигурацию и перезапускает Xray; это отдельная операция, для уже работающего Vision она не нужна.
-
-## Новая установка
-
-Ubuntu 22.04+ / Debian с systemd. Нужны root, `ss` (iproute2), свободные `443/tcp`, `8443/tcp`, `20000/udp` и отсутствие существующей установки Xray/Hysteria.
+**Установить на новый сервер:**
 
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/nesfe/UltraXRay/v2026.10.01/install.sh)
 ```
 
-Установщик спросит домен маскировки REALITY (принимает и URL) и пароль Hysteria; пустой пароль генерируется автоматически.
+Установщик спросит домен для REALITY и пароль Hysteria 2. Пустой пароль будет создан автоматически. Перед запуском нужны права `root` и утилита `ss` из пакета `iproute2`.
 
-### Сохранение Amnezia и других сервисов
-
-Режима очистки больше нет:
-
-- Docker, контейнеры, сети, Amnezia и Outline не удаляются и не останавливаются;
-- `iptables`/`nftables` не очищаются; чужие процессы на портах не завершаются;
-- занятые порты, в том числе опубликованные Docker, приводят к остановке до установки пакетов;
-- существующие конфиги, бинарники или systemd-службы Xray/Hysteria приводят к остановке; доступы не перегенерируются;
-- если UFW активен, добавляются только правила `443/tcp`, `8443/tcp`, `20000/udp`; остальные правила и политики сохраняются;
-- если UFW выключен, он остаётся выключенным. При необходимости откройте три порта в используемом firewall и панели VPS самостоятельно;
-- Hysteria в новой установке работает от пользователя `hysteria` на одном порту, без правил port hopping;
-- для `needrestart` выбран режим уведомления, а не автоматического перезапуска остальных служб.
-
-Это установщик новой конфигурации, а не механизм обновления или восстановления существующей. Если новая установка прервётся после записи файлов, повторный запуск остановится на проверке наличия установки; сначала нужно разобрать причину, а не удалять существующие данные автоматически.
-
-### Версии компонентов
-
-Новые установки используют **Xray 26.6.27** и **Hysteria 2.12.3**, а не произвольный `latest`. Для Edge важна совместимость серверной и клиентской REALITY-реализации: изменения Xray начиная с 26.9.8 требуют отдельной проверки. Закрепление версий обеспечивает воспроизводимость этого релиза и не заменяет дальнейшие обновления с проверкой совместимости.
-
-В Hysteria 2.12.3 исправлено ошибочное перенаправление исходящего UDP при port hopping. В этой версии UltraXRay port hopping для новых установок вообще не включается.
-
-**Публикация релиза не меняет уже работающий сервер.** В старых установках могут сохраняться диапазон UDP 20000–50000 и старая Hysteria. Их миграция — отдельная операция; утилита добавления Edge их не затрагивает.
-
-## Что сохраняется
-
-Конфигурация:
-
-- `/usr/local/etc/xray/config.json`;
-- `/etc/hysteria/config.yaml`, `server.crt`, `server.key`.
-
-Доступы:
-
-- `/root/ultraproxy.env`;
-- `/root/ultraxray-vless-link.txt`;
-- `/root/ultraxray-vless-vision-link.txt`;
-- `/root/ultraxray-vless-vision-edge-link.txt`;
-- `/root/ultraxray-hy2-link.txt`;
-- `/root/ultraxray-hy2-happ-auth-link.txt`;
-- `/root/ultraxray-hy2-single-link.txt`;
-- `/root/ultraxray-hy2-official-link.txt`.
-
-Для основных ссылок создаются PNG QR-коды. Ссылки содержат доступы: не публикуйте их и `ultraproxy.env` в репозитории.
-
-Повторный вывод ссылок, включая Edge из старого env-файла:
+<details>
+<summary><strong>Другой путь к Vision-ссылке или только вывод в терминал</strong></summary>
 
 ```bash
-bash scripts/generate-links.sh /root/ultraproxy.env
+python3 scripts/add-vision-edge.py /path/to/vision-link.txt --output-dir /path/to/output
+python3 scripts/add-vision-edge.py /path/to/vision-link.txt --print-only
 ```
 
-Hysteria использует самоподписанный сертификат. Official URI содержит `pinSHA256`; клиент должен поддерживать и проверять этот pin. Остальные варианты ссылок предназначены для разных импортёров и могут содержать `insecure=1` без pin. Совместимость импорта нужно проверять в конкретном приложении.
+Исходная ссылка и серверные доступы сохраняются. Без существующего Vision-профиля генератор сообщит об ошибке: он не создаёт серверный inbound.
+</details>
 
-## Диагностика и проверки разработки
+## 🧭 Профили
+
+| Профиль | Сеть | Когда выбрать |
+| --- | --- | --- |
+| **XHTTP + REALITY** | `443/tcp` | Основной VLESS-профиль с XHTTP и VLESS Encryption. Нужен клиент с поддержкой обоих параметров. |
+| **Vision + REALITY** | `8443/tcp` | VLESS Vision с TLS fingerprint `chrome`. |
+| **Vision EDGE + REALITY** | `8443/tcp` | Тот же Vision с TLS fingerprint `edge`: вариант для сетей, где начальный обмен с `chrome` зависает. |
+| **Hysteria 2 + Salamander** | `20000/udp` | Независимый UDP-профиль с одним портом. |
+
+**Vision и Vision EDGE используют один серверный вход:** UUID, REALITY-ключ, shortId, SNI и порт совпадают. Дополнительная ссылка меняет `fp=chrome` на `fp=edge` и название профиля. В одной проверенной сети Edge помог при зависании соединения; источник обрыва Chrome точно не установлен, поэтому результат в других сетях может отличаться.
+
+## 🔀 Как устроено
+
+```mermaid
+flowchart LR
+    C[Клиент] -->|443/tcp| X[Xray · XHTTP + REALITY]
+    C -->|8443/tcp · Chrome или Edge| V[Xray · Vision + REALITY]
+    C -->|20000/udp| H[Hysteria 2 · Salamander]
+    X --> I[Интернет]
+    V --> I
+    H --> I
+```
+
+Xray и Hysteria работают как отдельные службы. Новая установка использует **Xray 26.6.27** и **Hysteria 2.12.3**. Эти версии закреплены для воспроизводимости проверенных профилей; обновления Xray требуют повторной проверки совместимости REALITY-клиентов.
+
+### Соседние сервисы
+
+Установщик не удаляет Docker, Amnezia и Outline, не очищает `iptables`/`nftables` и не завершает процессы ради освобождения порта. При существующей установке или занятом порту он остановится до установки пакетов. Активный UFW получит только правила для трёх портов UltraXRay; выключенный UFW останется выключенным.
+
+В новых установках Hysteria слушает только `20000/udp`. Старые серверы могут по-прежнему использовать диапазон `20000–50000/udp`: публикация новой версии не меняет их конфигурацию.
+
+<details>
+<summary><strong>Куда сохраняются конфигурация, ссылки и QR-коды</strong></summary>
+
+| Что | Путь |
+| --- | --- |
+| Xray | `/usr/local/etc/xray/config.json` |
+| Hysteria и сертификат | `/etc/hysteria/` |
+| Параметры доступа | `/root/ultraproxy.env` |
+| Vision EDGE | `/root/ultraxray-vless-vision-edge-link.txt` |
+| Остальные ссылки и QR | `/root/ultraxray-*-link.txt`, `/root/ultraxray-*-qr.png` |
+
+Ссылки и `ultraproxy.env` содержат доступы. Сохраняйте их вне публичных репозиториев. Для самоподписанного сертификата Hysteria официальный URI включает `pinSHA256`; проверьте, что выбранный клиент действительно использует этот pin.
+</details>
+
+<details>
+<summary><strong>Проверка служб и соединения</strong></summary>
 
 ```bash
 systemctl status xray hysteria-server.service
 journalctl -u xray -u hysteria-server.service -n 80 --no-pager
 ss -lntup
-bash scripts/diagnose-server.sh /root/ultraproxy.env
 ```
 
-Диагностический скрипт выводит ссылки доступа: перед публикацией его вывода удалите секреты.
+Повторно вывести ссылки в локальном клоне:
 
 ```bash
-python3 -m unittest discover -s tests -v
-bash -n install.sh
-for script in scripts/*.sh; do bash -n "$script"; done
+bash scripts/generate-links.sh /root/ultraproxy.env
 ```
 
-Тесты проверяют сохранение параметров профиля, повторный запуск генератора, совместимость старых env-файлов, отказ при занятых портах и существующей установке, а также отсутствие сброса/включения UFW. Они не запускают установку пакетов на настоящем сервере.
+Диагностический скрипт `scripts/diagnose-server.sh` также выводит секретные ссылки: удалите их перед публикацией результатов.
+</details>
 
-## Документация
+## 📚 Подробнее
 
-- [Изменения](CHANGELOG.md)
-- [Архитектура](docs/ARCHITECTURE.md)
-- [Установщик](docs/INSTALLER_FLOW.md)
-- [Клиентские профили](docs/CLIENT_PROFILES.md)
-- [Диагностика](docs/TROUBLESHOOTING.md)
-- [Источники](docs/SOURCES.md)
+| Документ | Содержание |
+| --- | --- |
+| [История изменений](CHANGELOG.md) | Что вошло в релиз 2026.10.01 |
+| [Архитектура](docs/ARCHITECTURE.md) | Как работают два ядра и четыре профиля |
+| [Установщик](docs/INSTALLER_FLOW.md) | Порядок действий и проверки конфликтов |
+| [Клиентские профили](docs/CLIENT_PROFILES.md) | Параметры ссылок и импорт |
+| [Решение проблем](docs/TROUBLESHOOTING.md) | Логи, подключение и маршрутизация |
+| [Источники](docs/SOURCES.md) | Документация Xray и Hysteria |
+
+<sub>Проверки проекта: <code>python3 -m unittest discover -s tests -v</code> и GitHub Actions. Полная установка пакетов на чистой Ubuntu в рамках релиза 2026.10.01 не проверялась.</sub>
